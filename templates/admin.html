@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+  <title>IrriGator App - Admin</title>
+
+  <!-- Bootstrap -->
+  <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+  <!-- Bootstrap theme -->
+  <link href="{{ url_for('static', filename='css/bootstrap-theme.min.css') }}" rel="stylesheet">
+
+  <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+  <script src="{{ url_for('static', filename='js/jquery.min.js') }}"></script>
+
+  <!-- Include all compiled plugins (below), or include individual files as needed -->
+  <script src="{{ url_for('static', filename='js/bootstrap.min.js') }}"></script>
+
+  <!-- WebApp Manifest -->
+  <link rel="manifest" href="{{ url_for('manifest') }}">
+
+  <!-- Adding a Favicon -->
+  <link href="{{ url_for('static', filename='img/favicon.ico') }}" rel="icon" type="image/x-icon" />
+
+</head>
+
+<nav class="navbar navbar-inverse navbar-fixed-top">
+  <div class="container-fluid">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="/"><span class="glyphicon glyphicon-home"></span> IrriGator</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav navbar-right">
+        <li><a href="/schedule"><span class="glyphicon glyphicon-calendar"></span> Schedules</a></li>
+        <li><a href="/settings"><span class="glyphicon glyphicon-wrench"></span> Settings</a></li>
+        <li><a href="/admin"><span class="glyphicon glyphicon-user"></span> Admin</a></li>
+      </ul>
+    </div>
+  </div>
+</nav>
+<br>
+<br>
+<br>
+
+<!-- Main Body Container -->
+  <div class="container theme-showcase" role="main">
+
+    <div class="panel panel-primary">
+      <div class="panel-heading">
+        <h3 class="panel-title">System Info</h3>
+      </div>
+      <div class="panel-body">
+        {% for line in cpuinfo %}
+          {{ line }}<br>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="panel panel-primary">
+      <div class="panel-heading">
+        <h3 class="panel-title">Uptime</h3>
+      </div>
+      <div class="panel-body">{{ uptime }}</div>
+    </div>
+
+
+    <div class="panel panel-primary">
+      <div class="panel-heading">
+        <h3 class="panel-title"> Control Settings</h3>
+      </div>
+      <div class="panel-body">
+        <!-- Clear Controls -->
+        <form name="input" action="/admin/controls-reset">
+          <button type="submit" class="btn btn-lg btn-warning">Clear Controls</button>
+        </form>
+
+      </div>
+    </div>
+
+
+    <div class="panel panel-primary">
+      <div class="panel-heading">
+        <h3 class="panel-title"> Factory Settings</h3>
+      </div>
+      <div class="panel-body">
+        <!-- Factory Reset -->
+        <form name="input" action="/admin/factory-reset">
+          <button type="button" class="btn btn-lg btn-warning" data-toggle="modal" data-target="#factory_modal">Factory Reset</button>
+          <!-- Trigger the modal with a button -->
+
+          <!-- Modal -->
+          <div id="factory_modal" class="modal fade" role="dialog">
+            <div class="modal-dialog">
+
+              <!-- Modal content-->
+              <div class="modal-content">
+                <div class="modal-header">
+                  <button type="button" class="close" data-dismiss="modal">&times;</button>
+                  <h4 class="modal-title"><span style="font-size:1.25em;" class="glyphicon glyphicon-warning-sign"></span> Factory Reset Confirmation</h4>
+                </div>
+                <div class="modal-body">
+                  <p>Are you sure you would like to remove all settings including zones and schedules?
+                  <br><i>All data will be reset to factory settings.</i></p>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+                  <button type="submit" class="btn btn-danger btn-ok" name="reboot" value="True">Confirm Factory Reset</button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+        </form>
+      </div>
+    </div>
+
+
+    <div class="panel panel-primary">
+      <div class="panel-heading">
+        <h3 class="panel-title"> Administration Functions</h3>
+      </div>
+      <div class="panel-body">
+        <!-- Reboot -->
+        <form name="input" action="/admin/reboot">
+          <button type="button" class="btn btn-lg btn-warning" data-toggle="modal" data-target="#reboot_modal">Reboot System</button>
+          <!-- Trigger the modal with a button -->
+
+          <!-- Modal -->
+          <div id="reboot_modal" class="modal fade" role="dialog">
+            <div class="modal-dialog">
+
+              <!-- Modal content-->
+              <div class="modal-content">
+                <div class="modal-header">
+                  <button type="button" class="close" data-dismiss="modal">&times;</button>
+                  <h4 class="modal-title"><span style="font-size:1.25em;" class="glyphicon glyphicon-warning-sign"></span> Reboot Confirmation</h4>
+                </div>
+                <div class="modal-body">
+                  <p>Are you sure you would like to reboot the system?
+                  <br><i>Any unsaved data may be lost.</i></p>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+                  <button type="submit" class="btn btn-danger btn-ok" name="reboot" value="True">Confirm Reboot</button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+        </form>
+
+        <br><br>
+        <!-- Shutdown -->
+        <form name="input" action="/admin/shutdown">
+          <button type="button" class="btn btn-lg btn-danger" data-toggle="modal" data-target="#shutdown_modal">Shutdown System</button>
+          <!-- Trigger the modal with a button -->
+
+          <!-- Modal -->
+          <div id="shutdown_modal" class="modal fade" role="dialog">
+            <div class="modal-dialog">
+
+              <!-- Modal content-->
+              <div class="modal-content">
+                <div class="modal-header">
+                  <button type="button" class="close" data-dismiss="modal">&times;</button>
+                  <h4 class="modal-title"><span style="font-size:1.25em;" class="glyphicon glyphicon-warning-sign"></span> Shutdown Confirmation</h4>
+                </div>
+                <div class="modal-body">
+                  <p>Are you sure you would like to shutdown the system?
+                  <br><i>Any unsaved data may be lost.  System must be manually started after a shutdown.</i></p>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+                  <button type="submit" class="btn btn-danger btn-ok" name="shutdown" value="True">Confirm Shutdown</button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </form>
+
+      </div>
+    </div>
+
+    <div class="well">
+      <p style="color:grey">Irrigator Web Application created by <a href="http://parmeter.net/tech">Ben Parmeter</a>, copyright 2016-2020.</p>
+   </div>
+
+    <!-- *********** Credits *************** -->
+    <div class="panel-group">
+      <div class="panel panel-default">
+        <div class="panel-heading">
+          <h6 class="panel-title">
+            <a data-toggle="collapse" href="#collapse-new">
+              <span class="glyphicon glyphicon-bullhorn"></span> Credits and Licenses...
+              <span class="glyphicon glyphicon-plus-sign pull-right"></span>
+            </a>
+          </h6>
+        </div>
+        <div id="collapse-new" class="panel-collapse collapse">
+          <div class="panel-body">
+            <i>If you enjoy this software and feel the need to donate a cup of coffee, a frosty beer or a bottle of wine to the developer you can click <a href="https://paypal.me/benparmeter" target="blank">here.</a></i>
+            <i>Of course, none of this project would be available without the wonderful and amazing folks below... </i><br>
+            <ul class="list-group">
+              <li class="list-group-item">Bootstrap - Based entirely on Bootstrap and JQuery.  Bootstrap is released under the MIT license and is copyright 2016 Twitter. (<a href="http://getbootstrap.com" target="blank">Bootstrap</a>)</li>
+              <li class="list-group-item">JQuery - Required by Bootstrap. Copyright JS Foundation and other contributors. Released under MIT license. (<a href="https://jquery.org/license/" target="blank">jquery.org</a>)</li>
+              <li class="list-group-item">TitaToggle - Used for toggles. (<a href="http://kleinejan.github.io/titatoggle/" target="blank">TiTaToggle</a>)</li>
+              <li class="list-group-item">Glyphicons - Created by Jan Kovařík over at GLYPHICONS. (<a href="http://glyphicons.com" target="blank">http://glypicons.com</a>)</li>
+              <li class="list-group-item">Circliful - The MIT License (MIT), Copyright (c) 2014 Patric Gutersohn. (<a href="https://github.com/pguso/jquery-plugin-circliful" target="blank">Github</a>)</li>
+              <li class="list-group-item">WeatherUnderground Icons - Borrowed icons from this GitHub repository for weather display on the dashboard.  Released under MIT license (<a href="https://github.com/manifestinteractive/weather-underground-icons" target="blank">GitHub</a>)</li> 
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div> <!-- End of Body Container -->
+
+</body>
+</html>

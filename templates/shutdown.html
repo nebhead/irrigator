@@ -1,0 +1,65 @@
+
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    {% if "shutdown" in action %}
+      <meta http-equiv="refresh" content="5;url=/" />
+    {% elif "reboot" in action %}
+      <meta http-equiv="refresh" content="5;url=/" />
+    {% else %}
+      <meta http-equiv="refresh" content="3;url=/" />
+    {% endif %}
+
+    <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+    <title>Irrigator App</title>
+
+    <!-- Bootstrap -->
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <!-- Bootstrap theme -->
+    <link href="{{ url_for('static', filename='css/bootstrap-theme.min.css') }}" rel="stylesheet">
+
+    <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+    <script src="{{ url_for('static', filename='js/jquery.min.js') }}"></script>
+
+    <!-- Include all compiled plugins (below), or include individual files as needed -->
+    <script src="{{ url_for('static', filename='js/bootstrap.min.js') }}"></script>
+
+    <!-- WebApp Manifest -->
+    <link rel="manifest" href="{{ url_for('manifest') }}">
+
+    <!-- Favicon -->
+    <link href="{{ url_for('static', filename='img/favicon.ico') }}" rel="icon" type="image/x-icon" />
+
+  </head>
+
+
+  <body>
+
+    <div class="container theme-showcase" role="main">
+
+      <br>
+      {% if "shutdown" in action %}
+        <center>
+          <H1>Shutting Down...</H1><br>
+          Later skater.
+        </center>
+      {% elif "reboot" in action %}
+        <center>
+          <H1>Rebooting...</H1><br>
+          Hang in there, this could take a few minutes.
+        </center>
+      {% else %}
+        <center><H1>Unspecified Action</H1></center>
+      {% endif %}
+      <br>
+      <div class="progress">
+        <div class="progress-bar progress-bar-striped active" role="progressbar" aria-valuenow="80" aria-valuemin="0" aria-valuemax="80" style="width:100%"></div>
+      </div>
+
+    </div>
+
+  </body>
+</html>

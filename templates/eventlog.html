@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+  <title>IrriGator App - Event Log</title>
+
+  <!-- Bootstrap -->
+  <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+  <!-- Bootstrap theme -->
+  <link href="{{ url_for('static', filename='css/bootstrap-theme.min.css') }}" rel="stylesheet">
+
+  <!-- Ti-Ta-Toggle Bootstrap -->
+  <link href="{{ url_for('static', filename='css/titatoggle-dist.css') }}" rel="stylesheet">
+
+  <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+  <script src="{{ url_for('static', filename='js/jquery.min.js') }}"></script>
+
+  <!-- Include all compiled plugins (below), or include individual files as needed -->
+  <script src="{{ url_for('static', filename='js/bootstrap.min.js') }}"></script>
+
+  <!-- Enable Tooltip script -->
+  <script>
+    $(document).ready(function(){
+        $('[data-toggle="tooltip"]').tooltip();
+    });
+  </script>
+  <!-- Enable Circleful script -->
+  <link href="{{ url_for('static', filename='css/jquery.circliful.css') }}" rel="stylesheet" type="text/css" />
+  <script src="{{ url_for('static', filename='js/jquery.circliful.min.js') }}"></script>
+
+  <!-- Adding a Favicon -->
+  <link href="{{ url_for('static', filename='img/favicon.ico') }}" rel="icon" type="image/x-icon" />
+
+</head>
+<body>
+<nav class="navbar navbar-inverse navbar-fixed-top">
+  <div class="container-fluid">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="/"><span class="glyphicon glyphicon-home"></span> IrriGator</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav navbar-right">
+        <li><a href="/schedule"><span class="glyphicon glyphicon-calendar"></span> Schedules</a></li>
+        <li><a href="/settings"><span class="glyphicon glyphicon-wrench"></span> Settings</a></li>
+        <li><a href="/admin"><span class="glyphicon glyphicon-user"></span> Admin</a></li>
+      </ul>
+    </div>
+  </div>
+</nav>
+<br>
+<br>
+<br>
+
+
+  <div class="container theme-showcase" role="main">
+    <!-- Top Row -->
+    <!-- Event Log Information -->
+    <div class="panel panel-primary">
+      <div class="panel-heading">
+        <h3 class="panel-title"> Full Event Log
+          <span class="glyphicon glyphicon-list-alt pull-right"></span>
+        </h3>
+      </div>
+      <div class="panel-body">
+        <!-- Put Event Log Here -->
+        <table class="table table-striped">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Time</th>
+              <th>Event</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in range(num_events) %}
+              {% if "***** Control Script Starting *****" in event_list[row][2] %}
+                <tr class="success">
+              {% elif "***** Control Script Ended *****" in event_list[row][2] %}
+                <tr class="info">
+              {% elif "exiting with errorcode = 1" in event_list[row][2] %}
+                <tr class="danger">
+              {% elif "exiting with errorcode = 42" in event_list[row][2] %}
+                <tr class="warning">
+              {% else %}
+                <tr>
+              {% endif %}
+              {% for column in range(3) %}
+              <td> {{ event_list[row][column] }} </td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+      </div>
+    </div> <!-- end of Manual Controls Panel -->
+
+    <!-- Page Well Footer -->
+    <div class="well">
+      <p style="color:grey">IrriGator Web Application created by <a href="http://parmeter.net/tech">Ben Parmeter</a>, copyright 2016.
+      </p>
+    <p style="color:grey">For administration tasks <a href="/admin">click here.</a></p>
+    </div> <!-- End of Page Well Footer -->
+  </div> <!-- End of page container -->
+</body>
+</html>

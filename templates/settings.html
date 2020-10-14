@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+  <title>IrriGator App - Settings</title>
+
+  <!-- Bootstrap -->
+  <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+  <!-- Bootstrap theme -->
+  <link href="{{ url_for('static', filename='css/bootstrap-theme.min.css') }}" rel="stylesheet">
+
+  <!-- Ti-Ta-Toggle Bootstrap -->
+  <link href="{{ url_for('static', filename='css/titatoggle-dist.css') }}" rel="stylesheet">
+
+  <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+  <script src="{{ url_for('static', filename='js/jquery.min.js') }}"></script>
+
+  <!-- Include all compiled plugins (below), or include individual files as needed -->
+  <script src="{{ url_for('static', filename='js/bootstrap.min.js') }}"></script>
+
+  <!-- Enable Tooltip script -->
+  <script>
+    $(document).ready(function(){
+        $('[data-toggle="tooltip"]').tooltip();
+    });
+  </script>
+  <!-- Enable Circleful script -->
+  <link href="{{ url_for('static', filename='css/jquery.circliful.css') }}" rel="stylesheet" type="text/css" />
+  <script src="{{ url_for('static', filename='js/jquery.circliful.min.js') }}"></script>
+
+  <!-- Adding a Favicon -->
+  <link href="{{ url_for('static', filename='img/favicon.ico') }}" rel="icon" type="image/x-icon" />
+
+</head>
+
+<nav class="navbar navbar-inverse navbar-fixed-top">
+  <div class="container-fluid">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="/"><span class="glyphicon glyphicon-home"></span> IrriGator</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav navbar-right">
+        <li><a href="/schedule"><span class="glyphicon glyphicon-calendar"></span> Schedules</a></li>
+        <li><a href="/settings"><span class="glyphicon glyphicon-wrench"></span> Settings</a></li>
+        <li><a href="/admin"><span class="glyphicon glyphicon-user"></span> Admin</a></li>
+      </ul>
+    </div>
+  </div>
+</nav>
+<br>
+<br>
+<br>
+
+  <div class="container theme-showcase" role="main">
+
+    <!-- Succes -->
+    {% if (action == "modifyzone") and (success==True) %}
+      <div class="alert alert-success" role="alert">
+        <span class="glyphicon glyphicon-ok"></span>
+        <b> Zone Modified Successfully.</b>
+      </div>
+    {% elif (action == "modifyzone") and (success==False) %}
+      <div class="alert alert-danger" role="alert">
+        <span class="glyphicon glyphicon-remove"></span>
+        <b> Zone Modification Failed.</b><br>
+        <i><b>Detail: </b>{{ detail }}</i>
+      </div>
+    {% elif (action == "add") and (success==True) %}
+      <div class="alert alert-success" role="alert">
+        <span class="glyphicon glyphicon-ok"></span>
+        <b> Zone Added Successfully.</b>
+      </div>
+    {% elif (action == "add") and (success==False) %}
+      <div class="alert alert-danger" role="alert">
+        <span class="glyphicon glyphicon-remove"></span>
+        <b> Zone Add Failed.</b><br>
+        <i><b>Detail: </b>{{ detail }}</i>
+      </div>
+    {% elif (action == "system") and (success==True) %}
+      <div class="alert alert-success" role="alert">
+        <span class="glyphicon glyphicon-ok"></span>
+        <b> System Settings Modified Successfully.</b>
+      </div>
+    {% elif (action == "system") and (success==False) %}
+      <div class="alert alert-danger" role="alert">
+        <span class="glyphicon glyphicon-remove"></span>
+        <b> System Settings Modification Failed.</b><br>
+        <i><b>Detail: </b>{{ detail }}</i>
+      </div>
+    {% elif (action == "weather") and (success==True) %}
+      <div class="alert alert-success" role="alert">
+        <span class="glyphicon glyphicon-ok"></span>
+        <b> Weather Settings Modified Successfully.</b>
+      </div>
+    {% elif (action == "weather") and (success==False) %}
+      <div class="alert alert-danger" role="alert">
+        <span class="glyphicon glyphicon-remove"></span>
+        <b> Weather Settings Modification Failed.</b><br>
+        <i><b>Detail: </b>{{ detail }}</i>
+      </div>
+    {% endif %}
+
+    <!-- Weather Settings -->
+    <form name="input_weather" action="/settings/weather" method="POST">
+    <div class="panel panel-primary">
+      <div class="panel-heading">
+        <h3 class="panel-title"> Weather Settings
+          <span class="glyphicon glyphicon-cloud pull-right"></span>
+        </h3>
+      </div>
+      <div class="panel-body">
+        <!-- API Key Entry -->
+        <div class="row">
+          <div class="col-xs-6">
+            <label for="wx_api_key"><span class="glyphicon glyphicon-lock"></span> OpenWeatherMap API Key: </label>
+            <input type="text" class="form-control" id="wx_api_key" name="wx_api_key" value="{{ jdict['wx_data']['apikey'] }}">
+          </div>
+        </div>
+        <br>
+        <!-- Location Entry -->
+        <div class="row">
+          <div class="col-xs-6">
+            <label for="home_location"><span class="glyphicon glyphicon-map-marker"></span> Location [City, State[, Country]]: </label>
+            <input type="text" class="form-control" id="home_location" name="home_location" value="{{ jdict['wx_data']['location'] }}">
+          </div>
+        </div>
+        <br>
+        <!-- Max Percip Entry -->
+        <div class="row">
+          <div class="col-xs-6">
+            <label for="max_percip"><span class="glyphicon glyphicon-map-marker"></span> Max Percipitation: </label>
+            <input type="number" min="0" step="any" class="form-control" id="max_percip" name="max_percip" value="{{ jdict['wx_data']['percip'] }}">
+          </div>
+        </div>
+        <br>
+        <!-- Weather Exceptions -->
+        {% if jdict['wx_data']['disable'] == True %}
+          <button type="submit" class="btn btn-warning" name="force_wx" value="off">Weather Check Disabled</button>
+          <i>Schedules will run regardless if percipitation amounts exceed above amounts.</i>
+        {% else %}
+          <button type="submit" class="btn btn-success" name="force_wx" value="on">Weather Check Enabled</button>
+          <i>Schedules will not run if percipitation amounts exceed above amounts.</i>
+        {% endif %}
+        
+      </div>
+      <div class="panel-footer">
+        <button type="submit" class="btn btn-default">Save Changes</button>
+      </div>
+
+    </div> <!-- end of Weather Settings Panel -->
+    </form>
+
+    <!-- System Settings -->
+    <form name="input_weather" action="/settings/system" method="POST">
+    <div class="panel panel-primary">
+      <div class="panel-heading">
+        <h3 class="panel-title"> System Settings
+          <span class="glyphicon glyphicon-heart pull-right"></span>
+        </h3>
+      </div>
+      <div class="panel-body">
+        <!-- Edit Target System -->
+        <div class="row">
+          <div class="col-xs-6">
+            <label for="target_sys"><span class="glyphicon glyphicon-cog"></span> Target System: </label>
+            <select class="form-control" id="target_sys" name="target_sys">
+              {% if jdict['settings']['target_sys'] == 'CHIP' %}
+                <option value="CHIP" selected>CHIP</option>
+                <option value="RasPi">RasPi</option>
+                <option value="None">None</option>
+              {% elif jdict['settings']['target_sys'] == 'RasPi' %}
+                <option value="CHIP">CHIP</option>
+                <option value="RasPi" selected>RasPi</option>
+                <option value="None">None</option>
+              {% else %}
+                <option value="CHIP">CHIP</option>
+                <option value="RasPi">RasPi</option>
+                <option value="None" selected="">None</option>
+              {% endif %}
+            </select>
+          </div>
+        </div>
+        <br>
+        <i><b>NOTE:</b> Select target system such as Raspberry Pi (RasPi), NTC C.H.I.P.(CHIP), etc. or None.</i>
+      </div> <!-- end body -->
+      <div class="panel-footer">
+        <button type="submit" class="btn btn-default">Save Settings</button>
+      </div>
+    </div> <!-- End of Panel Group System Settings -->
+    </form>
+
+    <!-- Zone Settings -->
+    <div class="panel panel-primary">
+      <div class="panel-heading">
+        <h3 class="panel-title"> Zone Settings
+          <span class="glyphicon glyphicon-tint pull-right"></span>
+        </h3>
+      </div>
+      <div class="panel-body">
+
+        <!-- Zone Gate - Required to Gate GPIOs during reboot, power-on, shutdown -->
+        <form name="input_gate" action="/settings/modifygate" method="POST">
+
+          <div class="panel panel-default">
+            <div class="panel-heading">
+              <h3 class="panel-title"> Gate GPIO
+                <span class="glyphicon glyphicon-thumbs-up pull-right"></span>
+              </h3>
+            </div>
+            <div class="panel-body">
+              <!-- Edit Gate GPIO -->
+              <div class="row">
+                <div class="col-xs-6">
+                  <label for="zone_{{ index_key }}_gpio"><span class="glyphicon glyphicon-pushpin"></span> GPIO Pin: </label>
+                  <input type="number" min="0" max= "40" class="form-control" name="zone_gate" id="zone_gate" placeholder="{{ jdict['settings']['zone_gate'] }}">
+                </div>
+              </div>
+              <br>
+              <i>The Gate GPIO/Relay prevents the sprinklers from all going active during power-up, shutdown, and reboot.</i>
+            </div> <!-- Edit Zone Panel Body End -->
+
+            <div class="panel-footer">
+              <button type="submit" class="btn btn-default">Save Changes</button>
+            </div>
+          </div>
+
+        </form>
+
+        <!-- Existing Zone List -->
+        {% for index_key, index_value in jdict['zonemap'].items()|sort %}
+          <form name="input_{{ index_key }}" action="/settings/modifyzone" method="POST">
+            <input name="zone_name" type="hidden" value="{{ index_key }}">
+
+            <div class="panel panel-default">
+              <div class="panel-heading">
+                <h3 class="panel-title"> {{ index_key }}
+                  <span class="glyphicon glyphicon-record pull-right"></span>
+                </h3>
+              </div>
+              <div class="panel-body">
+                <!-- Edit Zone Name -->
+                <div class="row">
+                  <div class="col-xs-6">
+                    <label for="zone_{{ index_key }}_name"><span class="glyphicon glyphicon-flag"></span> Name/Label: </label>
+                    <input type="text" class="form-control" id="zone_name" name="new_name" placeholder="{{ index_key }}">
+                  </div>
+                </div>
+                <br>
+                <!-- Edit Zone GPIO -->
+                <div class="row">
+                  <div class="col-xs-6">
+                    <label for="zone_{{ index_key }}_gpio"><span class="glyphicon glyphicon-pushpin"></span> GPIO Pin: </label>
+                    <input type="number" min="0" max= "40" class="form-control" name="gpio_pin" id="zone_{{ index_key }}_gpio" placeholder="{{ jdict['zonemap'][index_key]['GPIO_mapping'] }}">
+                  </div>
+                </div>
+                <br>
+                <!-- Edit Zone Enabled -->
+                <div class="checkbox checkbox-slider-md checkbox-slider--b checkbox-slider-info">
+                  <label>
+                    {% if jdict['zonemap'][index_key]['enabled'] == True %}
+                      <input type="checkbox" name="enabled" checked><span><b>Zone Disabled/Enabled</b></span>
+                    {% else %}
+                      <input type="checkbox" name="enabled" unchecked><span><b>Zone Disabled/Enabled</b></span>
+                    {% endif %}
+                  </label>
+                </div>
+              </div> <!-- Edit Zone Panel Body End -->
+
+              <div class="panel-footer">
+                <button type="submit" class="btn btn-default">Save Changes</button>
+                <button type="button" class="btn btn-danger pull-right" data-toggle="modal" data-target="#myModal_{{ index_key }}">Delete Zone</button>
+                <!-- Trigger the modal with a button -->
+
+                <!-- Modal -->
+                <div id="myModal_{{ index_key }}" class="modal fade" role="dialog">
+                  <div class="modal-dialog">
+
+                    <!-- Modal content-->
+                    <div class="modal-content">
+                      <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal">&times;</button>
+                        <h4 class="modal-title"><span style="font-size:1.25em;" class="glyphicon glyphicon-warning-sign"></span> Delete Zone Confirmation</h4>
+                      </div>
+                      <div class="modal-body">
+                        <p>Are you sure you would like to delete this zone?
+                        <br><i>This action cannot be undone.</i></p>
+                      </div>
+                      <div class="modal-footer">
+                        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-danger btn-ok" name="delete" value="True">Confirm Delete</button>
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+
+              </div> <!-- Panel Footer End -->
+            </div> <!-- Zones Panel Body End -->
+          </form>
+        {% endfor %}
+
+        <!-- Add Zone Panel -->
+        <form name="add_zone" action="/settings/add" method="POST">
+        <div class="panel-group">
+          <div class="panel panel-success">
+            <div class="panel-heading">
+              <h4 class="panel-title">
+                <a data-toggle="collapse" href="#collapse-new">Add NEW Zone...
+                  <span class="glyphicon glyphicon-plus-sign pull-right"></span>
+                </a>
+              </h4>
+            </div>
+            <div id="collapse-new" class="panel-collapse collapse">
+              <div class="panel-body">
+                <!-- Add New Zone -->
+                <!-- Edit Zone Name -->
+                <div class="row">
+                  <div class="col-xs-6">
+                    <label for="zone_new_name"><span class="glyphicon glyphicon-flag"></span> Name/Label: </label>
+                    <input type="text" class="form-control" id="zone_new_name" name="zone_name" placeholder="zonename">
+                  </div>
+                </div>
+                <br>
+                <!-- Edit Zone GPIO -->
+                <div class="row">
+                  <div class="col-xs-6">
+                    <label for="zone_new_gpio"><span class="glyphicon glyphicon-pushpin"></span> GPIO Pin: </label>
+                    <input type="number" min="0" max= "40" class="form-control" id="zone_new_gpio" name="gpio_pin" placeholder="0">
+                  </div>
+                </div>
+                <br>
+                <!-- Edit Zone Enabled -->
+                <div class="checkbox checkbox-slider-md checkbox-slider--b checkbox-slider-info">
+                  <label>
+                      <input type="checkbox" name="enabled" checked><span><b>Zone Disabled/Enabled</b></span>
+                  </label>
+                </div>
+              </div> <!-- end body -->
+              <div class="panel-footer">
+                <button type="submit" class="btn btn-default">Save New Zone</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        </form>
+      </div>
+
+    </div>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,76 @@
+    <!-- Manual Controls -->
+    <div class="panel panel-primary">
+        <div class="panel-heading">
+          <h3 class="panel-title"> Manual Control
+            <span class="glyphicon glyphicon-off pull-right"></span>
+          </h3>
+        </div>
+        <div class="panel-body">
+          <!-- Put Manual Controls Here -->
+          <!-- Manual Control of Schedules Start -->
+          <div class="well">
+          <h4>Manual Schedule Control</h4>
+          <table class="table">
+            <thead>
+              <tr>
+                <th><span class="glyphicon glyphicon-calendar"></span> Schedule Name</th>
+                <th><span class="glyphicon glyphicon-tint"></span> Action</th>
+              </tr>
+            </thead>
+  
+            <tbody>
+              {% for index_key, index_value in jdict['schedules'].items()|sort %}
+                {% if jdict['schedules'][index_key]['start_time']['active'] == True %}
+                <!-- Stop Zone -->
+                <tr>
+                  <td>{{ index_key }}</td>
+                  <td><button type="submit" name="stop" class="btn btn-danger"><span class="glyphicon glyphicon-stop"></span>  Stop Schedule</button></td>
+                </tr>
+              {% else %}
+                <!-- Start Zone -->
+                <tr>
+                  <td>{{ index_key }}</td>
+                  <td><button type="submit" name="startsched" value="{{ index_key }}" class="btn btn-success"><span class="glyphicon glyphicon-play"></span>  Start Schedule</button></td>
+                </tr>
+              {% endif %}
+            {% endfor %}
+            </tbody>
+          </table>
+          <i><b>Note:</b> You must stop all zones / schedules before attempting to start a new zone or schedule. </i>
+        </div> <!-- end of Well -->
+  
+          <!-- Manual Control of Zones Start -->
+          <div class="well">
+          <h4>Manual Zone Control</h4>
+          <table class="table">
+            <thead>
+              <tr>
+                <th><span class="glyphicon glyphicon-star"></span> Zone Name</th>
+                <th><span class="glyphicon glyphicon-tint"></span> Action</th>
+              </tr>
+            </thead>
+  
+            <tbody>
+            {% for index_key, index_value in jdict['zonemap'].items()|sort %}
+              <!-- Start / Stop Zone -->
+              {% if jdict['zonemap'][index_key]['active'] == True %}
+                <!-- Stop Zone -->
+                <tr>
+                  <td>{{ index_key }}</td>
+                  <td><button type="submit" name="stop" class="btn btn-danger"><span class="glyphicon glyphicon-stop"></span>  Stop Zone</button></td>
+                </tr>
+              {% else %}
+                <!-- Start Zone -->
+                <tr>
+                  <td>{{ index_key }}</td>
+                  <td><button type="button" class="btn btn-success" data-toggle="modal" data-target="#duration-modal-{{ index_key }}"><span class="glyphicon glyphicon-play"></span>  Start Zone</button></td>
+                </tr>
+              {% endif %}
+            {% endfor %}
+            </tbody>
+          </table>
+          <i><b>Note:</b> You must stop all zones / schedules before attempting to start a new zone or schedule. </i>
+        </div> <!-- end of Well -->
+  
+        </div> <!-- end of Panel-Body Manual Controls -->
+      </div> <!-- end of Manual Controls Panel -->

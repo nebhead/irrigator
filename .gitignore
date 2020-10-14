@@ -1,0 +1,10 @@
+
+events.log
+
+irrigator.json
+
+.vscode/
+
+__pycache__/
+
+local/
