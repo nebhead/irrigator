@@ -20,6 +20,8 @@ def ReadJSON(json_data_filename="irrigator.json"):
         json_data_dict = json.loads(json_data_string)
         json_data_file.close()
     except:
+        event = f"Exception occured when reading {json_data_filename}.  Creating the file \'irrigator.json\' with default settings."
+        WriteLog(event)
         json_data_dict = createjson()
         WriteJSON(json_data_dict)
     return(json_data_dict)

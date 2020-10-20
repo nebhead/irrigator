@@ -148,27 +148,8 @@ if(args.duration):
 else:
 	duration = 0
 
-force = args.force
+# Store init relays flag
 init = args.init
-
-# Check for Rain
-api_key = json_data_dict['wx_data']['apikey']
-percip, errorcode = checkrain()
-event = "Percipitation in last 24 hours: " + str(percip)
-WriteLog(event)
-
-if(errorcode == 1):
-	event = "Invalid Latitude / Longitude Format."
-	WriteLog(event)
-elif(errorcode == 6):
-	event = "Weather Fetch Failed for some reason.  Bad API?  Network Issue?"
-	WriteLog(event)
-
-# If string "rain" found in weather output, then
-if (percip > json_data_dict['wx_data']['percip']):
-	raining = True
-else:
-	raining = False
 
 # *****************************************
 # Initialize Relays Globally
@@ -198,6 +179,30 @@ else:
 	WriteLog(event)
 	from platform_prototype import Platform 
 	platform = Platform(outpins)
+
+# Check for percipitation in the last 24 hours
+percip, errorcode = checkrain()
+if(errorcode == 1):
+	event = "Invalid Latitude / Longitude Format."
+elif(errorcode == 6):
+	event = "Weather Fetch Failed for some reason.  Bad API response?  Network Issue?"
+else:
+	event = "Percipitation in last 24 hours: " + str(percip)
+WriteLog(event)
+
+# Check if force run is enabled.  
+if ((args.force == True) or (json_data_dict['wx_data']['disable'] == True)):
+	force = True
+	event = "Force run selected. Ignoring percipitation."
+	WriteLog(event)
+else:
+	force = False
+
+# If percipitation amount has exceeded the maximum limit in 24 hours, set raining flag
+if (percip > json_data_dict['wx_data']['percip']):
+	raining = True
+else:
+	raining = False
 
 # *****************************************
 # Main Program If / Else Tree

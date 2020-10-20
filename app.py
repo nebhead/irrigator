@@ -85,9 +85,7 @@ def dashboard(action=None):
 					time.sleep(1)
 				json_data_dict = ReadJSON()
 
-	event_list, num_events = readeventlog()
-
-	return render_template('index.html', jdict=json_data_dict, event_list=event_list, num_events=num_events, weather_string=weather_string, icon_url=icon_url)
+	return render_template('index.html', jdict=json_data_dict, weather_string=weather_string, icon_url=icon_url)
 
 @app.route('/activesched', methods=['POST','GET'])
 def activesched(action=None):
@@ -116,6 +114,12 @@ def manual(action=None):
 	# Return HTML for schedule buttons
 	json_data_dict = ReadJSON()
 	return render_template('manual.html', jdict=json_data_dict) 
+
+@app.route('/shortlog', methods=['GET'])
+def shortlog(action=None):
+	# Return HTML for event list
+	event_list, num_events = readeventlog()
+	return render_template('shortlog.html', event_list=event_list, num_events=num_events) 
 
 @app.route('/schedule/<action>', methods=['POST','GET'])
 @app.route('/schedule', methods=['POST','GET'])
