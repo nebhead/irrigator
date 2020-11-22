@@ -43,6 +43,7 @@ Your mileage may vary, however, and your home sprinkler system might have some q
 * **MicroUSB Power Adapter** - At least 1 amp current recommended.  
 * **24V AC Power Supply / Brick** - I used the power supply from my old Toro sprinkler controller, which already had the leads spliced.  
 * **Dupont Cables** - Female to Female for connecting your GPIOs to the relay board. Readily found on Amazon, etc.  
+* **AC/DC Coverter [Optional]** - I just picked up a AC/DC converter that is capable of converting the 24V AC to a 5V DC input.  This allows me to remove the Raspberry Pi power supply and only use the 24V power brick for both the sprinkler solenoids and the Pi+Relays.  It's a little on the pricier side, but it cleans up your implementation by removing one more power-supply from the mix. [Amazon Link](https://www.amazon.com/gp/product/B00RE6QN4U)
 
 ### Raspberry Pi Default GPIO Mapping
 (FYI, this project is using BOARD pin mapping, not BCM pin mapping.  This means you'll need to use the pin number of the 40-pin header on the Pi instead of the BCM GPIO numbering)
