@@ -119,7 +119,7 @@ Once raspi-config is open, the following should be configured at a minimum.
 
 I've created a script to install this automatically, but it is in ALPHA testing.  Your mileage may vary, and if anything fails, you may just want to try running the manual steps below.  
 
-*NOTE: This script requires that you install on the 'pi' user account, otherwise the supervisor portion of the install will likely fail.*
+*NOTE: Do not use SUDO when running these commands.  Permissions will be aquired automatically.*
 
 After you've done the above steps to configure your raspberry pi, at the command line type the following:
 
@@ -131,7 +131,7 @@ OR you may find that it is more reliable to download the script to your raspberr
 
 ```
 wget https://raw.githubusercontent.com/nebhead/irrigator/main/auto-install/install.sh
-./install.sh
+bash install.sh
 ```
 
 Follow the onscreen prompts to complete the installation.  At the end of the script it will reboot, so just be aware of this.  
