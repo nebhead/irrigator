@@ -7,13 +7,13 @@
 # Description: Add cron entries for items
 #
 # 1. Add reboot script to initialize relays
-#  @reboot cd /home/pi/irrigator && sudo python3 control.py -i &
+#  @reboot cd /usr/local/bin/irrigator && sudo python3 control.py -i &
 #
 # 2. Add monthly log cleanup
-#  0 0 1 * * cd /home/pi/irrigator/logs && sh backup.sh
+#  0 0 1 * * cd /usr/local/bin/irrigator/logs && sh backup.sh
 #
 # 3. Add periodic weather check
-#  */15 * * * * cd /home/pi/irrigator && sudo python3 openwx.py
+#  */15 * * * * cd /usr/local/bin/irrigator && sudo python3 openwx.py
 #
 # *****************************************
 from crontab import CronTab
@@ -30,7 +30,7 @@ def checkexists(comment_string, system_cron):
 system_cron = CronTab(user='root')
 
 # Initialize Relays on Boot
-command_string = "cd /home/pi/irrigator && sudo python3 control.py -i &"
+command_string = "cd /usr/local/bin/irrigator && sudo python3 control.py -i &"
 comment_string = "Irrigator-Init"
 
 if (checkexists(comment_string, system_cron)==0):
@@ -41,7 +41,7 @@ if (checkexists(comment_string, system_cron)==0):
     system_cron.write()
 
 # Monthly Log Cleanup
-command_string = "cd /home/pi/irrigator/logs && sh backup.sh"
+command_string = "cd /usr/local/bin/irrigator/logs && sh backup.sh"
 comment_string = "Irrigator-Log"
 
 if (checkexists(comment_string, system_cron)==0):
@@ -52,7 +52,7 @@ if (checkexists(comment_string, system_cron)==0):
     system_cron.write()
 
 # Cache weather information every 15 minutes
-command_string = "cd /home/pi/irrigator && sudo python3 openwx.py"
+command_string = "cd /usr/local/bin/irrigator && sudo python3 openwx.py"
 comment_string = "Irrigator-WxCache"
 
 if (checkexists(comment_string, system_cron)==0):
@@ -66,7 +66,7 @@ if (checkexists(comment_string, system_cron)==0):
 json_data_dict = ReadJSON() # This will create default schedules if none exist
 
 for item in json_data_dict['schedules']:
-    command_string = "cd /home/pi/irrigator && sudo python3 control.py -s " + item + " &"
+    command_string = "cd /usr/local/bin/irrigator && sudo python3 control.py -s " + item + " &"
     if (checkexists(item, system_cron)==0):
         # If not found, create it.
         entry = system_cron.new(command=command_string,comment=item)

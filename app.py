@@ -18,7 +18,7 @@ from crontab import CronTab
 from common import *
 
 # Modify this path for your installation
-pathtoirrigator = "/home/pi/irrigator"
+pathtoirrigator = "/usr/local/bin/irrigator"
 
 app = Flask(__name__)
 
