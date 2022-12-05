@@ -134,23 +134,110 @@
           </div>
         </div>
         <br>
-        <!-- Max Percip Entry -->
+        <!-- Max precip Entry -->
         <div class="row">
           <div class="col-xs-6">
-            <label for="max_percip"><span class="glyphicon glyphicon-map-marker"></span> Max Percipitation: </label>
-            <input type="number" min="0" step="any" class="form-control" id="max_percip" name="max_percip" value="{{ jdict['wx_data']['percip'] }}">
+            <label for="max_precip"><span class="glyphicon glyphicon-arrow-up"></span> Max Precipitation ({% if jdict['wx_data']['units'] == 'F' %}inches{% else %}mm{% endif %}): </label>
+            <input type="number" min="0" step="0.01" class="form-control" id="max_precip" name="max_precip" value="{{ jdict['wx_data']['precip'] }}">
           </div>
         </div>
         <br>
-        <!-- Weather Exceptions -->
-        {% if jdict['wx_data']['disable'] == True %}
-          <button type="submit" class="btn btn-warning" name="force_wx" value="off">Weather Check Disabled</button>
-          <i>Schedules will run regardless if percipitation amounts exceed above amounts.</i>
-        {% else %}
-          <button type="submit" class="btn btn-success" name="force_wx" value="on">Weather Check Enabled</button>
-          <i>Schedules will not run if percipitation amounts exceed above amounts.</i>
-        {% endif %}
+
+        <!-- Enable Check History -->
+        <div class="checkbox checkbox-slider-md checkbox-slider--b checkbox-slider-info">
+          <label>
+            {% if jdict['wx_data']['history_enable'] == True %}
+              <input type="checkbox" name="history_enable" checked><span><b>Cancel Irrigation if Historical Precipitation Above Max Precipitation.</b></span>
+            {% else %}
+              <input type="checkbox" name="history_enable" unchecked><span><b>Cancel Irrigation if Historical Precipitation Above Max Precipitation.</b></span>
+            {% endif %}
+          </label>
+        </div>
+
+        <!-- Hours of History -->
+        <div class="row">
+          <div class="col-xs-6">
+            <label for="history_hours"><span class="glyphicon glyphicon-time"></span> Hours of Historical Precipitation to Track: </label>
+            <input type="number" min="0" max="96" step="1" class="form-control" id="history_hours" name="history_hours" value="{{ jdict['wx_data']['history_hours'] }}">
+          </div>
+        </div>
+        <br>
+
+        <!-- Enable Check Forecast -->
+        <div class="checkbox checkbox-slider-md checkbox-slider--b checkbox-slider-info">
+          <label>
+            {% if jdict['wx_data']['forecast_enable'] == True %}
+              <input type="checkbox" name="forecast_enable" checked><span><b>Cancel Irrigation if Forecasted Precipitation Above Max Precipitation.</b></span>
+            {% else %}
+              <input type="checkbox" name="forecast_enable" unchecked><span><b>Cancel Irrigation if Forecasted Precipitation Above Max Precipitation.</b></span>
+            {% endif %}
+          </label>
+        </div>
+        <!-- Hours of Forecast -->
+        <div class="row">
+          <div class="col-xs-6">
+            <label for="forecast_hours"><span class="glyphicon glyphicon-time"></span> Hours of Forecast Precipitation to Track: </label>
+            <input type="number" min="0" max="96" step="1" class="form-control" id="forecast_hours" name="forecast_hours" value="{{ jdict['wx_data']['forecast_hours'] }}">
+          </div>
+        </div>
+        <br>
         
+        <!-- Enable Check Forecast + History -->
+        <div class="checkbox checkbox-slider-md checkbox-slider--b checkbox-slider-info">
+          <label>
+            {% if jdict['wx_data']['forecast_history_enable'] == True %}
+              <input type="checkbox" name="forecast_history_enable" checked><span><b>Cancel Irrigation if Forecasted + Historical Precipitation Above Max Precipitation.</b></span>
+            {% else %}
+              <input type="checkbox" name="forecast_history_enable" unchecked><span><b>Cancel Irrigation if Forecasted + Historical Precipitation Above Max Precipitation.</b></span>
+            {% endif %}
+          </label>
+        </div>
+        <br>
+
+        <!-- Enable Check Temperature -->
+        <div class="checkbox checkbox-slider-md checkbox-slider--b checkbox-slider-info">
+          <label>
+            {% if jdict['wx_data']['temp_enable'] == True %}
+              <input type="checkbox" name="temp_enable" checked><span><b>Cancel Irrigation if Current Temperature Falls Outside Min-Max.</b></span>
+            {% else %}
+              <input type="checkbox" name="temp_enable" unchecked><span><b>Cancel Irrigation if Current Temperature Falls Outside Min-Max.</b></span>
+            {% endif %}
+          </label>
+        </div>
+        <!-- Maximum Temperature -->
+        <div class="row">
+          <div class="col-xs-6">
+            <label for="max_temp"><span class="glyphicon glyphicon-fire"></span> Max Temperature ({{ jdict['wx_data']['units'] }}): </label>
+            <input type="number" max="130" step="1" class="form-control" id="max_temp" name="max_temp" value="{{ jdict['wx_data']['max_temp'] }}">
+          </div>
+        </div>
+        <br>
+        <!-- Minimum Temperature -->
+        <div class="row">
+          <div class="col-xs-6">
+            <label for="min_temp"><span class="glyphicon glyphicon-asterisk"></span> Min Temperature ({{ jdict['wx_data']['units'] }}): </label>
+            <input type="number" max="130" step="1" class="form-control" id="min_temp" name="min_temp" value="{{ jdict['wx_data']['min_temp'] }}">
+          </div>
+        </div>
+        <br>
+      
+        <!-- Units Selection -->
+        <b><span class="glyphicon glyphicon-stats"></span> Units Selection:</b><br>
+        <div class="radio">
+          <label><input type="radio" name="unitsradio" value="F"{% if jdict['wx_data']['units'] == 'F' %}checked{% endif %}>&deg;F & inches</label>
+        </div>
+        <div class="radio">
+          <label><input type="radio" name="unitsradio" value="C"{% if jdict['wx_data']['units'] == 'C' %}checked{% endif %}>&deg;C & mm</label>
+        </div>
+        <!-- Units Dropdown
+        <div class="form-group">
+          <label for="units">Units Selection:</label>
+          <select class="form-control" id="units">
+            <option value="F"{% if jdict['wx_data']['units'] == 'F' %} selected{% endif %}>&deg;F & inches</option>
+            <option value="C"{% if jdict['wx_data']['units'] == 'C' %} selected{% endif %}>&deg;C & mm</option>
+          </select>
+        </div> 
+        -->
       </div>
       <div class="panel-footer">
         <button type="submit" class="btn btn-default">Save Changes</button>

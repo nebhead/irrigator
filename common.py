@@ -13,22 +13,27 @@ import datetime
 from cron_descriptor import get_description, ExpressionDescriptor
 
 # Control uses this
-def ReadJSON(json_data_filename="irrigator.json"):
+def ReadJSON(json_data_filename="irrigator.json", type="settings"):
     try:
         json_data_file = open(json_data_filename, 'r')
         json_data_string = json_data_file.read()
         json_data_dict = json.loads(json_data_string)
         json_data_file.close()
     except:
-        event = f"Exception occured when reading {json_data_filename}.  Creating the file \'irrigator.json\' with default settings."
+        event = f"Exception occured when reading {json_data_filename}.  Creating the file with default settings."
         WriteLog(event)
-        json_data_dict = createjson()
-        WriteJSON(json_data_dict)
+        if type == 'weather': 
+            json_data_dict = create_wx_json()
+            WriteJSON(json_data_dict)
+        else: 
+            json_data_dict = create_json()
+            WriteJSON(json_data_dict)
+
     return(json_data_dict)
 
 # Control uses this
 def WriteJSON(json_data_dict, json_data_filename="irrigator.json"):
-	json_data_string = json.dumps(json_data_dict)
+	json_data_string = json.dumps(json_data_dict, indent=2)
 	with open(json_data_filename, 'w') as settings_file:
 	    settings_file.write(json_data_string)
 
@@ -46,7 +51,7 @@ def WriteLog(event):
 	logfile.write(now + ' ' + event + '\n')
 	logfile.close()
 
-def createjson():
+def create_json():
     irrigator = {}
 
     irrigator['controls'] = {
@@ -61,12 +66,19 @@ def createjson():
 
     irrigator['wx_data'] = {
         'apikey': '123456789abcdefghijklmnopqrstuvxyz', # OpenWeatherMap APIkey
-        'latlong': '44.0611151,-121.3846839',
+        'lat': '44.0611151',
+        'long': '-121.3846839', 
         'location' : 'Bend, OR',
+        'temp_enable' : True,
         'min_temp': 32,
         'max_temp': 100,
-        'percip' : 0.2, # Max Percipitation Cancel Irrigation
-        'disable': False  # Disable Weather Restrictions (i.e. Force)
+        'precip' : 0.2,  # Max Precipitation Cancel Irrigation
+        'history_enable': True,  # Disable Weather Restrictions (i.e. Force)
+        'history_hours': 24,  # Number of hours of history to track precipitation
+        'forecast_hours': 24,  # Number of hours to forecast precipitation
+        'forecast_enable': True,  # Enable forecast checking
+        'forecast_history_enable': True,  # Enable forecast + history > precip max, cancel irrigation
+        'units': 'F'
     }
 
     irrigator['zonemap'] = {
@@ -181,3 +193,18 @@ def createjson():
         index_b['start_time']['human_readable'] = get_description(temp_cron_str)
 
     return(irrigator)
+
+def create_wx_json():
+    wx_status = {}
+    wx_status = {
+		'summary' : 'Nothing to Report',
+		'icon' : '/static/img/wx-icons/unknown.png',
+		'updated' : '', 
+		'last_rain_update' : 0,
+		'rain_history_list' : [],
+        'rain_history_total' : 0,
+        'rain_current' : 0,
+		'rain_forecast' : 0.0,
+        'temp_current' : 0,
+	}
+    return(wx_status)

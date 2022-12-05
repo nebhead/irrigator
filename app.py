@@ -26,7 +26,7 @@ app = Flask(__name__)
 @app.route('/', methods=['POST','GET'])
 def dashboard(action=None):
 	json_data_dict = ReadJSON()
-	weather_string, icon_url = CheckWeather()
+	wx_status = ReadJSON('wx_status.json', type="weather")
 
 	if (request.method == 'POST') and (action == 'manualcontrol'):
 		response = request.form
@@ -85,7 +85,7 @@ def dashboard(action=None):
 					time.sleep(1)
 				json_data_dict = ReadJSON()
 
-	return render_template('index.html', jdict=json_data_dict, weather_string=weather_string, icon_url=icon_url)
+	return render_template('index.html', jdict=json_data_dict, wx_status=wx_status)
 
 @app.route('/activesched', methods=['POST','GET'])
 def activesched(action=None):
@@ -503,38 +503,79 @@ def settings(action=None):
 		success = True
 		detail = ""
 		response = request.form
+		update_weather_data = False
+		print(response)
 		if ('wx_api_key' in response):
 			if (response['wx_api_key'] != ''):
-				json_data_dict['wx_data']['apikey'] = str(response['wx_api_key'])
-				WriteJSON(json_data_dict)
-				execute_string = "python3 openwx.py" # Get weather after updating API Key or Location
-				os.system(execute_string) # Execute
+				if json_data_dict['wx_data']['apikey'] != str(response['wx_api_key']):
+					json_data_dict['wx_data']['apikey'] = str(response['wx_api_key'])
+					update_weather_data = True
 
 		if ('home_location' in response):
 			if (response['home_location'] != ''):
-				json_data_dict['wx_data']['location'] = str(response['home_location'])
-				WriteJSON(json_data_dict)
-				execute_string = "python3 openwx.py" # Get weather after updating API Key or Location
-				os.system(execute_string) # Execute
+				if json_data_dict['wx_data']['location'] != str(response['home_location']):
+					json_data_dict['wx_data']['location'] = str(response['home_location'])
+					update_weather_data = True
 
-		if ('max_percip' in response):
-			if (response['max_percip'] != ''):
-				if (float(response['max_percip']) > 0) and (float(response['max_percip']) < 10):
-					json_data_dict['wx_data']['percip'] = float(response['max_percip'])
+		if ('max_precip' in response):
+			if (response['max_precip'] != ''):
+				if (float(response['max_precip']) > 0) and (float(response['max_precip']) < 10):
+					json_data_dict['wx_data']['precip'] = float(response['max_precip'])
 				else:
 					success = False
-					detail = "Max Percipitation Out of Bounds.\n"
+					detail = "Max precipitation Out of Bounds.\n"
 
-		if ('force_wx' in response):
-			if (response['force_wx'] == u'on'):
-				json_data_dict['wx_data']['disable'] = True
-			else:
-				json_data_dict['wx_data']['disable'] = False
+		if ('history_enable' in response):
+			if (response['history_enable'] == 'on'):
+				json_data_dict['wx_data']['history_enable'] = True
 		else:
-			json_data_dict['wx_data']['disable'] = False
+			json_data_dict['wx_data']['history_enable'] = False
+
+		if ('history_hours' in response):
+			if (response['history_hours'] != ''):
+				json_data_dict['wx_data']['history_hours'] = int(response['history_hours'])
+
+		if ('forecast_hours' in response):
+			if (response['forecast_hours'] != ''):
+				json_data_dict['wx_data']['forecast_hours'] = int(response['forecast_hours'])
+
+		if ('forecast_enable' in response):
+			if (response['forecast_enable'] == 'on'):
+				json_data_dict['wx_data']['forecast_enable'] = True
+		else:
+			json_data_dict['wx_data']['forecast_enable'] = False
+
+		if ('forecast_history_enable' in response):
+			if (response['forecast_history_enable'] == 'on'):
+				json_data_dict['wx_data']['forecast_history_enable'] = True
+		else:
+			json_data_dict['wx_data']['forecast_history_enable'] = False
+
+		if ('temp_enable' in response):
+			if (response['temp_enable'] == 'on'):
+				json_data_dict['wx_data']['temp_enable'] = True
+		else:
+			json_data_dict['wx_data']['temp_enable'] = False
+
+		if ('max_temp' in response):
+			if (response['max_temp'] != ''):
+				json_data_dict['wx_data']['max_temp'] = int(response['max_temp'])
+
+		if ('min_temp' in response):
+			if (response['min_temp'] != ''):
+				json_data_dict['wx_data']['min_temp'] = int(response['min_temp'])
+
+		if ('unitsradio' in response):
+			if response['unitsradio'] == 'F':
+				json_data_dict['wx_data']['units'] = 'F'
+			else:
+				json_data_dict['wx_data']['units'] = 'C'
 
 		if(success==True):
 			WriteJSON(json_data_dict)
+			if(update_weather_data):
+				execute_string = "python3 openwx.py" # Get weather after updating API Key or Location
+				os.system(execute_string) # Execute
 
 	elif (request.method == 'POST') and (action == 'modifygate'):
 		success = True
@@ -575,8 +616,10 @@ def admin(action=None):
 		for schedule_name, schedule_data in json_data_dict['schedules'].items():
 			update_crontab(json_data_dict, schedule_name, 'delete')
 		# Build new JSON with default values
-		json_data_dict = createjson()
+		json_data_dict = create_json()
 		WriteJSON(json_data_dict)
+		json_data_dict = create_wx_json()
+		WriteJSON(json_data_dict, 'wx_status.json')
 		os.system("sudo python3 initcron.py") # Initialize Relays
 
 	elif action == 'controls-reset':
@@ -687,8 +730,7 @@ def update_crontab(json_data_dict, sched_name, action):
 		system_cron.write()
 	else:
 		for entry in system_cron.find_comment(sched_name):
-		    print(entry) # Black Magic for finding the CRON Job
-
+			print(entry) # Black Magic for finding the CRON Job
 		if (entry==0):
 			print("Did not find entry.")
 			# If not found, create it.
@@ -712,22 +754,6 @@ def update_crontab(json_data_dict, sched_name, action):
 			errorcode = 30
 
 	return(errorcode)
-
-def CheckWeather():
-	# *****************************************
-	# Function: CheckWeather
-	# Input: none
-	# Description: Check current weather, return Temp, Summary, Icon
-	# *****************************************
-	wx_data_file = open("wx_status.json", "r")
-	json_data_string = wx_data_file.read()
-	wx_status = json.loads(json_data_string)
-	wx_data_file.close()
-
-	weather_string = '<b>' + wx_status['summary'] + '<br>Percipitation: ' + str(wx_status['percipitation']) + 'in.</b><br><i>Updated ' + wx_status['updated'] + '</i>'
-	icon_url = wx_status['icon']
-
-	return(weather_string, icon_url)
 
 def CheckConflicts(json_data_dict):
 	# Function to check for Schedule Conflicts
@@ -932,5 +958,5 @@ def CheckConflicts(json_data_dict):
 	return(conflict_found, conflict_msg)
 
 if __name__ == '__main__':
-    #app.run(host='0.0.0.0')
-	app.run(host='0.0.0.0',debug=True) # Use this instead of the above line for debug mode
+    app.run(host='0.0.0.0')
+	#app.run(host='0.0.0.0',debug=True) # Use this instead of the above line for debug mode

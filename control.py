@@ -68,26 +68,21 @@ def CheckOverride(json_data_filename):
 
 	return (errorcode)
 
-def checkrain():
+def checkweather():
 	# *****************************************
 	# Function: checkrain
 	# Input: none
 	# Output: amount, errorcode
-	# Description:  Read percipitation amount for last day from file
+	# Description:  Read precipitation amount for last day from file
 	# *****************************************
 	errorcode = 0
 	try:
-		wx_data_file = open("wx_status.json", "r")
-		json_data_string = wx_data_file.read()
-		wx_status = json.loads(json_data_string)
-		wx_data_file.close()
-		amount = wx_status['percipitation']
-
+		wx_status = ReadJSON("wx_status.json", type="weather")
 	except:
-		amount = 0.0
+		wx_status = create_wx_json()
 		errorcode = 6
 
-	return(amount, errorcode)
+	return(wx_status, errorcode)
 
 # *****************************************
 # Main Program Start
@@ -180,29 +175,53 @@ else:
 	from platform_prototype import Platform 
 	platform = Platform(outpins)
 
-# Check for percipitation in the last 24 hours
-percip, errorcode = checkrain()
-if(errorcode == 1):
-	event = "Invalid Latitude / Longitude Format."
-elif(errorcode == 6):
+# Check weather status
+wx_status, errorcode = checkweather()
+p_units = 'inches' if json_data_dict['wx_data']['units'] == 'F' else 'mm'
+if errorcode != 0:
 	event = "Weather Fetch Failed for some reason.  Bad API response?  Network Issue?"
 else:
-	event = "Percipitation in last 24 hours: " + str(percip)
-WriteLog(event)
+	event = ""
+	if json_data_dict['wx_data']['temp_enable']:
+		event += f"Current Temperature: {wx_status['temp_current']}{json_data_dict['wx_data']['units']} "
+	if json_data_dict['wx_data']['history_enable']:
+		event += f"Precipitation History: {wx_status['rain_history_total']} {p_units} "
+	if json_data_dict['wx_data']['forecast_enable']:
+		event += f"Precipitation Forecast: {wx_status['rain_forecast']} {p_units} "
+	if event != "":
+		WriteLog(event)
 
 # Check if force run is enabled.  
-if ((args.force == True) or (json_data_dict['wx_data']['disable'] == True)):
+if ((args.force == True)):
 	force = True
-	event = "Force run selected. Ignoring percipitation."
+	event = "Force run selected. Ignoring weather."
 	WriteLog(event)
 else:
 	force = False
 
-# If percipitation amount has exceeded the maximum limit in 24 hours, set raining flag
-if (percip > json_data_dict['wx_data']['percip']):
-	raining = True
-else:
-	raining = False
+# Check weather flags
+wx_cancel = False  # Set Weather Cancel to False 
+wx_cancel_reason = ""
+
+# Check rain history > precip max 
+if (json_data_dict['wx_data']['history_enable']) and (wx_status['rain_history_total'] > json_data_dict['wx_data']['precip']):
+	wx_cancel = True
+	wx_cancel_reason += "(Precipitation History) "
+
+# Check rain forecast > precip max 
+if (json_data_dict['wx_data']['forecast_enable']) and (wx_status['rain_forecast'] > json_data_dict['wx_data']['precip']):
+	wx_cancel = True
+	wx_cancel_reason += "(Precipitation Forecast) "
+
+# Check temperature exceeds limits 
+if (json_data_dict['wx_data']['temp_enable']) and ((wx_status['temp_current'] < json_data_dict['wx_data']['min_temp']) or (wx_status['temp_current'] > json_data_dict['wx_data']['max_temp'])):
+	wx_cancel = True
+	wx_cancel_reason += "(Temperature) "
+
+# Check rain forecast + history > precip max 
+if (json_data_dict['wx_data']['forecast_history_enable']) and (wx_status['rain_forecast'] + wx_status['rain_history_total'] > json_data_dict['wx_data']['precip']):
+	wx_cancel = True
+	wx_cancel_reason += "(Precipitation Forecast + History) "
 
 # *****************************************
 # Main Program If / Else Tree
@@ -213,7 +232,7 @@ if (init):
 	WriteLog(event)
 	errorcode = 0
 # Schedule Run
-elif ((schedule_run == True) and ((raining == False) or (force == True))):
+elif ((schedule_run == True) and ((wx_cancel == False) or (force == True))):
 	event = "Schedule Run Selected with Schedule: " + schedule_selected
 	WriteLog(event)
 
@@ -240,7 +259,7 @@ elif ((schedule_run == True) and ((raining == False) or (force == True))):
 		WriteLog(event)
 		errorcode = 1
 # Manual Run
-elif ((schedule_run == False) and ((raining == False) or (force == True))):
+elif ((schedule_run == False) and ((wx_cancel == False) or (force == True))):
 	event = "Manual Run Selected."
 	WriteLog(event)
 	if (zone in json_data_dict['zonemap']):
@@ -256,8 +275,8 @@ elif ((schedule_run == False) and ((raining == False) or (force == True))):
 		errorcode = 1
 
 # Weather Cancellation
-elif (raining == True):
-	event = "Irrigation cancelled due to percipitation exceeding limits."
+elif (wx_cancel == True):
+	event = f"Irrigation cancelled due to weather status exceeding limits. {wx_cancel_reason}"
 	WriteLog(event)
 	errorcode = 1
 

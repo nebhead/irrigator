@@ -96,10 +96,17 @@
             <!-- Put Weather Status Here -->
             <div class="media">
               <div class="media-left">
-                <img src="{{ icon_url }}" class="media-object" style="width:60px">
+                <img src="{{ wx_status['icon'] }}" class="media-object" style="width:60px">
               </div>
               <div class="media-body">
-                <p>{{ weather_string|safe }}</p>
+                <p>
+                  <b>Temperature:</b> {{ wx_status['temp_current']}}&deg;{{ jdict['wx_data']['units'] }}<br>
+                  <b>Conditions:</b> {{ wx_status['summary'] }}<br>
+                  <b>Rain(last {{ jdict['wx_data']['history_hours']}} hrs):</b> {{ wx_status['rain_history_total'] }} {% if jdict['wx_data']['units'] == 'F' %}inches{% else %}mm{% endif %}<br>
+                  <b>Rain(forecast {{ jdict['wx_data']['forecast_hours']}} hrs):</b> {{ wx_status['rain_forecast'] }} {% if jdict['wx_data']['units'] == 'F' %}inches{% else %}mm{% endif %}<br>
+                  <i><b>Updated:</b> {{ wx_status['updated'] }}</i><br>
+                  <i>{{ jdict['wx_data']['location'] }}</i>
+                </p>
               </div>
             </div>
           </div>
