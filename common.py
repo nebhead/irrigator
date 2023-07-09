@@ -208,3 +208,21 @@ def create_wx_json():
         'temp_current' : 0,
 	}
     return(wx_status)
+
+
+# **************************************
+# is_raspberrypi() function borrowed from user https://raspberrypi.stackexchange.com/users/126953/chris
+# in post: https://raspberrypi.stackexchange.com/questions/5100/detect-that-a-python-program-is-running-on-the-pi
+# **************************************
+def is_raspberry_pi():
+	"""
+	Check if device is a Raspberry Pi
+
+	:return: True if Raspberry Pi. False otherwise
+	"""
+	try:
+		with io.open('/sys/firmware/devicetree/base/model', 'r') as m:
+			if 'raspberry pi' in m.read().lower(): return True
+	except Exception:
+		pass
+	return False

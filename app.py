@@ -420,6 +420,14 @@ def settings(action=None):
 									#create new dictionary entry and copy contents of old entry to new entry
 									json_data_dict['zonemap'][str(response['new_name'])] = json_data_dict['zonemap'][str(response['zone_name'])]
 									del json_data_dict['zonemap'][str(response['zone_name'])]
+									
+									#check schedules to see if the zone that was just changed is used and replace
+									for schedule in json_data_dict['schedules']:
+										for zone in json_data_dict['schedules'][schedule]['zones']:
+											if zone == response['zone_name']:
+												json_data_dict['schedules'][schedule]['zones'][str(response['new_name'])] = json_data_dict['schedules'][schedule]['zones'][zone]
+												del json_data_dict['schedules'][schedule]['zones'][zone]
+												break
 								else:
 									success = False
 									detail = detail + "Special Characters or Space Character Found: \"" + special_chars + "\" in " + str(response['new_name']) + ".  Remove and try again.\n"
@@ -958,5 +966,7 @@ def CheckConflicts(json_data_dict):
 	return(conflict_found, conflict_msg)
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0')
-	#app.run(host='0.0.0.0',debug=True) # Use this instead of the above line for debug mode
+	if is_raspberry_pi():
+		app.run(host='0.0.0.0')
+	else:
+		app.run(host='0.0.0.0',debug=True) # Use this instead of the above line for debug mode
