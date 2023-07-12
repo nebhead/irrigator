@@ -38,7 +38,7 @@ Your mileage may vary, however, and your home sprinkler system might have some q
 ### The Parts List
 
 * **Raspberry Pi Zero W** - Technically any Raspberry Pi will do fine, but for this application a Raspberry Pi Zero W works really well (wifi is built right in)and is the right price.
-* **8-Channel Relay** - Technically you can use any number of channels that you need (plus the gate channel), but in my setup I used this 8-channel relay for my zones. [Amazon Link](https://www.amazon.com/dp/B0057OC5WK/ref=cm_sw_em_r_mt_dp_U_TktNCbPC5MVRB)
+* **8-Channel Relay** - Technically you can use any number of channels that you need (plus the gate channel), but in my setup I used this 8-channel relay for my zones. **Irrigator uses Active Low logic**, so ensure you get an Active Low or Low Trigger relay.  You can also modify the code in control.py to reverse the logic if needed. [Amazon Link](https://www.amazon.com/dp/B0057OC5WK/ref=cm_sw_em_r_mt_dp_U_TktNCbPC5MVRB)
 * **Micro SD Card** - Greater than 4GB is probably good.  
 * **MicroUSB Power Adapter** - At least 1 amp current recommended.  
 * **24V AC Power Supply / Brick** - I used the power supply from my old Toro sprinkler controller, which already had the leads spliced.  
