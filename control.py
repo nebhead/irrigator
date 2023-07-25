@@ -27,7 +27,7 @@ import os
 import json
 from common import *
 
-def Irrigate(platform, zonename, duration, json_data_filename):
+def Irrigate(platform, zonename, duration, json_data_filename, relay_trigger=0):
 	# *****************************************
 	# Function: Irrigate
 	# Input: platform, str zonename, int duration, str json_data_filename
@@ -37,7 +37,7 @@ def Irrigate(platform, zonename, duration, json_data_filename):
 
 	event = f"Turning on Zone: {zonename} for {duration} minutes."
 	WriteLog(event)
-	errorcode = errorcode + platform.setrelay(0, zonename) # Turning on Zone
+	errorcode = errorcode + platform.setrelay(relay_trigger, zonename) # Turning on Zone
 
 	starttime = time.time()
 	now = starttime
@@ -52,7 +52,7 @@ def Irrigate(platform, zonename, duration, json_data_filename):
 	event = f"Turning off Zone: {zonename}."
 	WriteLog(event)
 
-	errorcode = errorcode + platform.setrelay(1, zonename) # Turning off Zone
+	errorcode = errorcode + platform.setrelay((not relay_trigger), zonename) # Turning off Zone
 	if (CheckOverride(json_data_filename) > 0):
 		errorcode = 42
 
@@ -70,7 +70,7 @@ def CheckOverride(json_data_filename):
 
 def checkweather():
 	# *****************************************
-	# Function: checkrain
+	# Function: checkweather
 	# Input: none
 	# Output: amount, errorcode
 	# Description:  Read precipitation amount for last day from file
@@ -99,7 +99,7 @@ def checkweather():
 event = "***** Control Script Starting *****"
 WriteLog(event)
 
-# Parse Input Arguements
+# Parse Input Arguments
 parser = argparse.ArgumentParser(description='Irrigator - Sprinkler Zone Control Script.  Usage as follows: ')
 parser.add_argument('-z','--zone', help='Manually turn on zone. (-z [zone_name])',required=False)
 parser.add_argument('-d','--duration',help='Duration to turn on zone. (NOTE: Works with manual zone control only)', required=False)
@@ -121,6 +121,8 @@ else:
 
 # General open & read JSON into a dictionary
 json_data_dict = ReadJSON(json_data_filename)
+
+relay_trigger = json_data_dict['settings']['relay_trigger']
 
 # Flag Control Active at beginning of script
 json_data_dict['controls']['active'] = True
@@ -246,7 +248,7 @@ elif ((schedule_run == True) and ((wx_cancel == False) or (force == True))):
 				json_data_dict['zonemap'][index_key]['active'] = True # Set Zone Active = False
 				WriteJSON(json_data_dict, json_data_filename)
 				# Run Zone
-				errorcode = Irrigate(platform, index_key, index_value['duration'], json_data_filename)
+				errorcode = Irrigate(platform, index_key, index_value['duration'], json_data_filename, relay_trigger=relay_trigger)
 				# Read latest control data from JSON file (just in case anything changed)
 				json_data_dict = ReadJSON(json_data_filename)
 				json_data_dict['zonemap'][index_key]['active'] = False # Set Zone Active = False
@@ -266,7 +268,7 @@ elif ((schedule_run == False) and ((wx_cancel == False) or (force == True))):
 		json_data_dict['zonemap'][zone]['active'] = True # Set Zone Active = True
 		WriteJSON(json_data_dict, json_data_filename)
 		# Run Zone
-		errorcode = Irrigate(platform, zone, duration, json_data_filename)
+		errorcode = Irrigate(platform, zone, duration, json_data_filename, relay_trigger=relay_trigger)
 		json_data_dict['zonemap'][zone]['active'] = False # Set Zone Active = False
 		WriteJSON(json_data_dict, json_data_filename)
 	else:

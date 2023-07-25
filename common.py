@@ -10,6 +10,7 @@
 
 import json
 import datetime
+import io
 from cron_descriptor import get_description, ExpressionDescriptor
 
 # Control uses this
@@ -19,14 +20,29 @@ def ReadJSON(json_data_filename="irrigator.json", type="settings"):
         json_data_string = json_data_file.read()
         json_data_dict = json.loads(json_data_string)
         json_data_file.close()
-    except:
-        event = f"Exception occured when reading {json_data_filename}.  Creating the file with default settings."
+    except(IOError, OSError):
+		# File not found, write defaults
+        event = f"Exception occurred when reading {json_data_filename}.  File not found.  Creating the file with default settings."
         WriteLog(event)
         if type == 'weather': 
             json_data_dict = create_wx_json()
-            WriteJSON(json_data_dict)
+            WriteJSON(json_data_dict, json_data_filename='wx_status.json')
         else: 
             json_data_dict = create_json()
+            WriteJSON(json_data_dict)
+    except(ValueError):
+		# A ValueError Exception occurs when multiple accesses collide, this code attempts a retry.
+        event = f'Exception occurred when reading {json_data_filename}.  Value Error Exception - JSONDecodeError.  Retrying.'
+        WriteLog(event)
+        json_data_file.close()
+		# Retry Reading JSON
+        json_data_dict = ReadJSON(json_data_filename, type)
+
+    if type != 'weather':
+        # Check relay trigger which was added post-initial release 
+        if 'relay_trigger' not in json_data_dict['settings'].keys():
+            relay_trigger = 0  # Set default to active low (0) triggered relays 
+            json_data_dict['settings']['relay_trigger'] = 0  # set the default to active low (0) triggered in settings, and save
             WriteJSON(json_data_dict)
 
     return(json_data_dict)
@@ -60,8 +76,9 @@ def create_json():
     }
 
     irrigator['settings'] = {
-        'target_sys': 'None', # Select CHIP, RasPi or test
-        'zone_gate': 29 # This is the GPIO pin responsible for gating the sprinkler pins during power-up, shutdown, and reboot
+        'target_sys': 'None',  # Select CHIP, RasPi or test
+        'zone_gate': 29,       # This is the GPIO pin responsible for gating the sprinkler pins during power-up, shutdown, and reboot
+        'relay_trigger' : 0    # 0 for active low relays, 1 for active high relays 
     }
 
     irrigator['wx_data'] = {

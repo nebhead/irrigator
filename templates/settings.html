@@ -258,7 +258,7 @@
         <!-- Edit Target System -->
         <div class="row">
           <div class="col-xs-6">
-            <label for="target_sys"><span class="glyphicon glyphicon-cog"></span> Target System: </label>
+            <label for="target_sys"><span class="glyphicon glyphicon-cog"></span>&nbsp; Target System: </label>
             <select class="form-control" id="target_sys" name="target_sys">
               {% if jdict['settings']['target_sys'] == 'CHIP' %}
                 <option value="CHIP" selected>CHIP</option>
@@ -278,6 +278,25 @@
         </div>
         <br>
         <i><b>NOTE:</b> Select target system such as Raspberry Pi (RasPi), NTC C.H.I.P.(CHIP), etc. or None.</i>
+        <br><br>
+        <!-- Edit Relay Trigger -->
+        <div class="row">
+          <div class="col-xs-6">
+            <label for="relay_trigger"><span class="glyphicon glyphicon-random"></span>&nbsp; Relay Trigger Settings: </label>
+            <select class="form-control" id="target_sys" name="relay_trigger">
+              {% if jdict['settings']['relay_trigger'] == 0 %}
+                <option value="0" selected>Active Low Trigger</option>
+                <option value="1">Active High Trigger</option>
+              {% else %}
+                <option value="0">Active Low Trigger</option>
+                <option value="1" selected>Active High Trigger</option>
+              {% endif %}
+            </select>
+          </div>
+        </div>
+        <br>
+        <i><b>NOTE:</b> Select relay trigger settings.  Active Low Trigger [Default] (ON when 0), Active High Trigger (ON when 1).</i>
+
       </div> <!-- end body -->
       <div class="panel-footer">
         <button type="submit" class="btn btn-default">Save Settings</button>

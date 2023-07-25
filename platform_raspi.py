@@ -22,12 +22,12 @@ import RPi.GPIO as GPIO
 
 class Platform:
 
-	def __init__(self, _outpins):
+	def __init__(self, _outpins, relay_trigger=0):
 		self.outpins = _outpins # { 'zone_00' : 17, 'zone_01': 18, etc... }
 		GPIO.setwarnings(False)
 		GPIO.setmode(GPIO.BOARD)
 		for item in self.outpins:
-			GPIO.setup(self.outpins[item], GPIO.OUT, initial=1) #Set the Zone Pins High
+			GPIO.setup(self.outpins[item], GPIO.OUT, initial=(not relay_trigger)) #Set the Zone Pins to 'Off'
 	
 	def setrelay(self, value, zonename):
 		try: 

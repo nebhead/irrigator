@@ -501,7 +501,15 @@ def settings(action=None):
 			else:
 				success = False
 				detail = "Unrecognized System Type Selected.\n"
-
+		if ('relay_trigger' in response):
+			if(response['relay_trigger'] == '0'):
+				json_data_dict['settings']['relay_trigger'] = 0
+			elif(response['relay_trigger'] == '1'):
+				json_data_dict['settings']['relay_trigger'] = 1
+			else:
+				success = False
+				detail = "Unrecognized Relay Trigger Setting.\n"
+		
 		if(success==True):
 			print('Success:  Writing JSON data to file.')
 			WriteJSON(json_data_dict)  

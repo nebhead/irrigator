@@ -20,13 +20,17 @@ import CHIP_IO.GPIO as GPIO
 # Class Definition
 # *****************************************
 class Platform:
-	def __init__(self, _outpins):
+	def __init__(self, _outpins, relay_trigger=0):
 		self.outpins = _outpins # { 'zone_00' : 17, 'zone_01': 18, etc... }
 		# Set the Zone / Gate Pins High
 		for item in self.outpins:
 			pin_name = "XIO-P" + str(self.outpins[item])
 			GPIO.setup(pin_name, GPIO.OUT)
 			GPIO.output(pin_name, GPIO.HIGH)
+			if(relay_trigger == 1):
+				GPIO.output(pin_name, GPIO.LOW)
+			else:
+				GPIO.output(pin_name, GPIO.HIGH)
 
 	def setrelay(self, value, zonename):
 		try:
