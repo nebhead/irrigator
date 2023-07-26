@@ -23,7 +23,7 @@ import datetime
 import json
 import requests
 from geopy.geocoders import Nominatim
-from common import ReadJSON, WriteJSON
+from common import ReadJSON, WriteJSON, WriteLog
 
 def CheckCurrentWx(wx_data, wx_status):
 	# *****************************************
@@ -219,17 +219,15 @@ def main():
 
 	try:
 		geolocator = Nominatim(user_agent="irrigator")
-		details = geolocator.geocode(location)
-		lat = str(details.latitude)
-		long = str(details.longitude)
+		details = geolocator.geocode(location, timeout=None)  # Added timeout=None to prevent timeout errors
+		irrigator['wx_data']['lat'] = str(details.latitude)
+		irrigator['wx_data']['long'] = str(details.longitude)
+		WriteJSON(irrigator, "irrigator.json")  # Update Lat/Long in weather data settings
 
 	except:
-		lat = ""
-		long = ""
+		event = "Error getting data from Geolocator, using stored Lat/Long instead."
+		WriteLog(event)
 
-	irrigator['wx_data']['lat'] = lat 
-	irrigator['wx_data']['long'] = long
-	WriteJSON(irrigator, "irrigator.json")  # Update Lat/Long in weather data settings
 	wx_data = irrigator['wx_data']
 
 	#Get Current Weather Data
