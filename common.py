@@ -8,6 +8,7 @@
 #
 # *****************************************
 
+import time
 import json
 import datetime
 import io
@@ -38,13 +39,20 @@ def ReadJSON(json_data_filename="irrigator.json", type="settings"):
 		# Retry Reading JSON
         json_data_dict = ReadJSON(json_data_filename, type)
 
-    if type != 'weather':
+    if type == 'settings':
         # Check relay trigger which was added post-initial release 
         if 'relay_trigger' not in json_data_dict['settings'].keys():
             relay_trigger = 0  # Set default to active low (0) triggered relays 
             json_data_dict['settings']['relay_trigger'] = 0  # set the default to active low (0) triggered in settings, and save
             WriteJSON(json_data_dict)
-
+        # Check if history and forecast days are set
+        if 'history_days' not in json_data_dict['wx_data']:
+            json_data_dict['wx_data']['history_days'] = 2 
+            json_data_dict['wx_data']['forecast_days'] = 2
+            WriteJSON(json_data_dict)
+            wx_data = create_wx_json()
+            WriteJSON(wx_data, json_data_filename='wx_status.json')
+    
     return(json_data_dict)
 
 # Control uses this
@@ -91,8 +99,8 @@ def create_json():
         'max_temp': 100,
         'precip' : 0.2,  # Max Precipitation Cancel Irrigation
         'history_enable': True,  # Disable Weather Restrictions (i.e. Force)
-        'history_hours': 24,  # Number of hours of history to track precipitation
-        'forecast_hours': 24,  # Number of hours to forecast precipitation
+        'history_days': 2,  # Number of days of history to track precipitation
+        'forecast_days': 2,  # Number of days to forecast precipitation
         'forecast_enable': True,  # Enable forecast checking
         'forecast_history_enable': True,  # Enable forecast + history > precip max, cancel irrigation
         'units': 'F'
@@ -217,12 +225,11 @@ def create_wx_json():
 		'summary' : 'Nothing to Report',
 		'icon' : '/static/img/wx-icons/unknown.png',
 		'updated' : '', 
-		'last_rain_update' : 0,
-		'rain_history_list' : [],
         'rain_history_total' : 0,
         'rain_current' : 0,
 		'rain_forecast' : 0.0,
         'temp_current' : 0,
+        'dt' : int(time.time())
 	}
     return(wx_status)
 

@@ -19,37 +19,89 @@
 # *****************************************
 
 import time
-import datetime
+from datetime import datetime
 import json
 import requests
 from geopy.geocoders import Nominatim
 from common import ReadJSON, WriteJSON, WriteLog
 
-def CheckCurrentWx(wx_data, wx_status):
+def get_rain_history(wx_data):
+	"""
+	Calculates the rain history for a given location and time period.
+
+	:param wx_data: A dictionary containing the weather data.
+	:type wx_data: dict
+	:return: The rain history for the given location and time period.
+	:rtype: float
+	"""
+	lat = wx_data['lat']
+	long = wx_data['long'] 
+	wx_api_key = wx_data['apikey']
+	history_days = wx_data['history_days']
+	amount = 0.0
+	year_month = datetime.today().strftime('%Y-%m')
+	day = int(datetime.today().strftime('%d'))
+	
+	try:
+		for index in range(history_days):
+			date = f'{year_month}-{day - (index+1)}'
+			url = f'https://api.openweathermap.org/data/3.0/onecall/day_summary?lat={lat}&lon={long}&date={date}&appid={wx_api_key}'
+
+			if wx_data['units'] == 'F':
+				url += '&units=imperial'
+			print(f'  {url}')
+
+			r = requests.get(url)
+			parsed_json = json.loads(r.text)
+			#print(f'  {parsed_json}')
+
+			# If an error occurs, return 0
+			if 'cod' in parsed_json:
+				if parsed_json['cod'] == 401:
+					print(f'ERROR Retrieving History Data: {parsed_json["cod"]} {parsed_json["message"]}')
+					return 0.0
+
+			if 'precipitation' in parsed_json:
+				amount += parsed_json['precipitation']['total']
+
+		if amount > 0 and wx_data['units'] == 'F':
+			# Convert mm to inches
+			amount = amount * 0.0393701
+
+		rain_history = round(amount, 2) # Round to 2 decimal places
+
+	except:
+		rain_history = 0.0
+		print('Oops! Weather Forecast Lookup Error.')
+		raise
+
+	return rain_history
+
+def get_current_forecast(wx_data, wx_status={}):
 	# *****************************************
-	# Function: CheckWx
+	# Function: Retrieves current weather conditions and forecast
 	# Input: str lat, str long, str api_key
-	# Output: float amount (persipitation inches)
+	# Output: float amount (precipitation inches)
 	# Description:  Get weather data for location
 	# *****************************************
 	lat = wx_data['lat']
 	long = wx_data['long'] 
 	wx_api_key = wx_data['apikey']
-	history_hours = wx_data['history_hours']
+	forecast_days = wx_data['forecast_days']
 
 	try:
 		# Set Update Date / Time String 
-		now = str(datetime.datetime.now())
-		now = now[0:19] # Truncate the microseconds
-		wx_status['updated'] = now 
-
+		wx_status['updated'] = datetime.today().strftime('%Y-%m-%d %H:%M')
+		wx_status['dt'] = int(time.time())
+		
 		# Get Current Weather Data
-		url = f'https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={long}&appid={wx_api_key}'
+		url = f'https://api.openweathermap.org/data/3.0/onecall?lat={lat}&lon={long}&appid={wx_api_key}'
 		if wx_data['units'] == 'F':
 			url += '&units=imperial'
 		print(f'  {url}')
 		r = requests.get(url)
 		parsed_json = json.loads(r.text)
+		#print(f'  {parsed_json}')
 
 		# If something went wrong with the request
 		if('message' in parsed_json):
@@ -59,19 +111,18 @@ def CheckCurrentWx(wx_data, wx_status):
 			wx_status['rain_history_list'] = []
 			wx_status['rain_history_total'] = 0.0
 			wx_status['temp_current'] = 0
-			wx_status['last_rain_update'] = int(time.time())
 			return(wx_status)
 
 		# Get Current Temperature
-		if('main' in parsed_json):
-			wx_status['temp_current'] = int(parsed_json['main']['temp'])
+		if('current' in parsed_json):
+			wx_status['temp_current'] = int(parsed_json['current']['temp'])
 		else:
 			wx_status['temp_current'] = 0
 
 		# Get current weather summary and icon
-		if('weather' in parsed_json):
-			wx_status['summary'] = parsed_json['weather'][0]['main']
-			icon = parsed_json['weather'][0]['icon']
+		if('weather' in parsed_json['current']):
+			wx_status['summary'] = parsed_json['current']['weather'][0]['main']
+			icon = parsed_json['current']['weather'][0]['icon']
 		else:
 			wx_status['summary'] = "No Summary."
 			icon = "00x"
@@ -106,8 +157,8 @@ def CheckCurrentWx(wx_data, wx_status):
 
 		# If rain in the last hour, get rain amount
 		amount = 0.0
-		if('rain' in parsed_json):
-			amount = float(parsed_json['rain']['1h'])
+		if('rain' in parsed_json['current']):
+			amount = float(parsed_json['current']['rain']['1h'])
 			if amount > 0 and wx_data['units'] == 'F':
 				# Convert mm to inches
 				amount = round(amount * 0.0393701, 2)
@@ -116,94 +167,29 @@ def CheckCurrentWx(wx_data, wx_status):
 		
 		wx_status['rain_current'] = amount
 
-		# Check last time we updated the rain amount
-		if('dt' in parsed_json):
-			# Check if there has been a large gap (>3 hours) since the last check and clear queue if needed
-			if int(parsed_json['dt']) > (wx_status['last_rain_update'] + (3 * 3600)):
-				wx_status['rain_history_list'] = []
-				wx_status['rain_history_list'].append(amount)
-				wx_status['last_rain_update'] = int(parsed_json['dt'])
+		if('daily' in parsed_json):
+			# Get rain forecast (daily)
+			amount = 0.0
+			for day in range(forecast_days):
+				if('rain' in parsed_json['daily'][day]):
+					amount += float(parsed_json['daily'][day]['rain'])
 
-			# Check if 1h+ has passed since last storing the rain_amount
-			if int(parsed_json['dt']) > (wx_status['last_rain_update'] + 3660):
-				wx_status['last_rain_update'] = int(parsed_json['dt']) 
-				wx_status['rain_history_list'].insert(0, amount)
-				if len(wx_status['rain_history_list']) > history_hours:
-					wx_status['rain_history_list'].pop()
-
-			wx_status['rain_history_total'] = calculate_rain_history(wx_status['rain_history_list'])
+			if amount > 0 and wx_data['units'] == 'F':
+				# Convert mm to inches
+				amount = round(amount * 0.0393701, 2)
+			elif amount > 0:
+				amount = round(amount, 2)
+			wx_status['rain_forecast'] = amount
 
 	except:
 		wx_status['summary'] = "Oops! Weather Lookup Error."
 		wx_status['icon'] = '/static/img/wx-icons/unknown.png'
 		wx_status['rain_current'] = 0.0
-		wx_status['rain_history_list'] = []
-		wx_status['rain_history_total'] = 0.0
+		wx_status['rain_forecast'] = 0.0
 		wx_status['temp_current'] = 0
-		wx_status['dt'] = int(time.time())
 
 	return wx_status
 
-def CheckForecast(wx_data):
-	# *****************************************
-	# Function: CheckWx
-	# Input: str lat, str long, str api_key, int hours
-	# Output: float amount in inches
-	# Description:  Get weather forecast for location
-	# *****************************************
-	lat = wx_data['lat']
-	long = wx_data['long'] 
-	wx_api_key = wx_data['apikey']
-	forecast_hours = wx_data['forecast_hours']
-	amount = 0.0
-	
-	try:
-		# For a 4-day forecast
-		# https://api.openweathermap.org/data/2.5/forecast?lat=38.6785&lon=-121.2258&appid={APIKEY}
-		url = f'https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={long}&appid={wx_api_key}'
-		if wx_data['units'] == 'F':
-			url += '&units=imperial'
-		print(f'  {url}')
-		r = requests.get(url)
-		parsed_json = json.loads(r.text)
-
-		# If an error occurs, return 0
-		if 'cod' in parsed_json:
-			if parsed_json['cod'] == 401:
-				return 0.0
-
-		# Get forecast list
-		if 'list' in parsed_json:
-			if forecast_hours < 3:
-				forecast_hours = 3
-			if forecast_hours > 96:
-				forecast_hours = 96
-			hours = forecast_hours // 3
-			if hours <= len(parsed_json['list']):
-				for item in range(hours):
-					if 'rain' in parsed_json['list'][item]:
-						amount += float(parsed_json['list'][item]['rain']['3h'])
-
-				if amount > 0 and wx_data['units'] == 'F':
-					# Convert mm to inches
-					amount = amount * 0.0393701
-
-		forecast_rain = round(amount, 2)
-
-	except:
-		forecast_rain = 0.0
-		print('Oops! Weather Forecast Lookup Error.')
-		raise
-
-	return forecast_rain
-
-def calculate_rain_history(rain_history_list):
-	amount = 0.0
-
-	for hour_amount in range(len(rain_history_list)):
-		amount += rain_history_list[hour_amount]
-
-	return round(amount, 2) 
 
 def main():
     # *****************************************************
@@ -231,23 +217,23 @@ def main():
 	wx_data = irrigator['wx_data']
 
 	#Get Current Weather Data
-	print(f'- Checking Current Weather.')
+	print(f'\n- Checking Current Weather & Forecast.')
 	# Set the number of hours to keep a record of for rain/precipitation 
-	wx_status = CheckCurrentWx(wx_data, wx_status)
+	wx_status = get_current_forecast(wx_data, wx_status)
 
-	#Get Forecast Weather Data
-	if wx_data['forecast_enable']:
-		print(f'- Checking Forecast for {wx_data["forecast_hours"]} hours in the future.')
-		rain_forecast = CheckForecast(wx_data)
+	#Get Historical Weather Data
+	if wx_data['history_enable']:
+		print(f'\n- Checking History for {wx_data["history_days"]} days in the past.')
+		rain_history = get_rain_history(wx_data)
 	else:
-		rain_forecast = 0.0
+		rain_history = 0.0
 
-	wx_status['rain_forecast'] = rain_forecast
+	wx_status['rain_history_total'] = rain_history
 
 	#Write weather.json
 	WriteJSON(wx_status, 'wx_status.json')
 
-	print(f"- Fetched Data:")
+	print(f"\n- Fetched Data:")
 	print(f"	Location address: {wx_data['location']}")
 	print(f"	Latitude:    {wx_data['lat']}")
 	print(f"	Longitude:   {wx_data['long']}")
@@ -255,9 +241,9 @@ def main():
 	print(f"	Icon:        {wx_status['icon']}")
 	print(f"	Temperature: {wx_status['temp_current']}\u00b0{wx_data['units']}")
 	print(f"	Precipitation Current: {wx_status['rain_current']}")
-	print(f"	Precipitation History ({len(wx_status['rain_history_list'])}hrs): {wx_status['rain_history_total']}")
-	print(f"	Precipitation Forecast({wx_data['forecast_hours']}hrs): {wx_status['rain_forecast']}")
-	print(f"	Unix Time:   {wx_status['last_rain_update']}  Updated Time: {wx_status['updated']}")
+	print(f"	Precipitation History ({wx_data['history_days']}days): {wx_status['rain_history_total']}")
+	print(f"	Precipitation Forecast({wx_data['forecast_days']}days): {wx_status['rain_forecast']}")
+	print(f"	Unix Time:   {wx_status['dt']}  Updated Time: {wx_status['updated']}")
 
 if __name__ == "__main__":
     main()

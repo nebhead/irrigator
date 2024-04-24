@@ -102,8 +102,8 @@
                 <p>
                   <b>Temperature:</b> {{ wx_status['temp_current']}}&deg;{{ jdict['wx_data']['units'] }}<br>
                   <b>Conditions:</b> {{ wx_status['summary'] }}<br>
-                  <b>Rain(last {{ jdict['wx_data']['history_hours']}} hrs):</b> {{ wx_status['rain_history_total'] }} {% if jdict['wx_data']['units'] == 'F' %}inches{% else %}mm{% endif %}<br>
-                  <b>Rain(forecast {{ jdict['wx_data']['forecast_hours']}} hrs):</b> {{ wx_status['rain_forecast'] }} {% if jdict['wx_data']['units'] == 'F' %}inches{% else %}mm{% endif %}<br>
+                  <b>Rain(last {{ jdict['wx_data']['history_days']}} days):</b> {{ wx_status['rain_history_total'] }} {% if jdict['wx_data']['units'] == 'F' %}inches{% else %}mm{% endif %}<br>
+                  <b>Rain(next {{ jdict['wx_data']['forecast_days']}} days):</b> {{ wx_status['rain_forecast'] }} {% if jdict['wx_data']['units'] == 'F' %}inches{% else %}mm{% endif %}<br>
                   <i><b>Updated:</b> {{ wx_status['updated'] }}</i><br>
                   <i>{{ jdict['wx_data']['location'] }}</i>
                 </p>

@@ -62,7 +62,7 @@
 
   <div class="container theme-showcase" role="main">
 
-    <!-- Succes -->
+    <!-- Success -->
     {% if (action == "modifyzone") and (success==True) %}
       <div class="alert alert-success" role="alert">
         <span class="glyphicon glyphicon-ok"></span>
@@ -157,8 +157,8 @@
         <!-- Hours of History -->
         <div class="row">
           <div class="col-xs-6">
-            <label for="history_hours"><span class="glyphicon glyphicon-time"></span> Hours of Historical Precipitation to Track: </label>
-            <input type="number" min="0" max="96" step="1" class="form-control" id="history_hours" name="history_hours" value="{{ jdict['wx_data']['history_hours'] }}">
+            <label for="history_days"><span class="glyphicon glyphicon-time"></span> Days of Historical Precipitation to Track: </label>
+            <input type="number" min="0" max="14" step="1" class="form-control" id="history_days" name="history_days" value="{{ jdict['wx_data']['history_days'] }}">
           </div>
         </div>
         <br>
@@ -176,8 +176,8 @@
         <!-- Hours of Forecast -->
         <div class="row">
           <div class="col-xs-6">
-            <label for="forecast_hours"><span class="glyphicon glyphicon-time"></span> Hours of Forecast Precipitation to Track: </label>
-            <input type="number" min="0" max="96" step="1" class="form-control" id="forecast_hours" name="forecast_hours" value="{{ jdict['wx_data']['forecast_hours'] }}">
+            <label for="forecast_days"><span class="glyphicon glyphicon-time"></span> Days of Forecast Precipitation to Track: </label>
+            <input type="number" min="0" max="7" step="1" class="form-control" id="forecast_days" name="forecast_days" value="{{ jdict['wx_data']['forecast_days'] }}">
           </div>
         </div>
         <br>

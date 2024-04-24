@@ -547,13 +547,13 @@ def settings(action=None):
 		else:
 			json_data_dict['wx_data']['history_enable'] = False
 
-		if ('history_hours' in response):
-			if (response['history_hours'] != ''):
-				json_data_dict['wx_data']['history_hours'] = int(response['history_hours'])
+		if ('history_days' in response):
+			if (response['history_days'] != ''):
+				json_data_dict['wx_data']['history_days'] = int(response['history_days'])
 
-		if ('forecast_hours' in response):
-			if (response['forecast_hours'] != ''):
-				json_data_dict['wx_data']['forecast_hours'] = int(response['forecast_hours'])
+		if ('forecast_days' in response):
+			if (response['forecast_days'] != ''):
+				json_data_dict['wx_data']['forecast_days'] = int(response['forecast_days'])
 
 		if ('forecast_enable' in response):
 			if (response['forecast_enable'] == 'on'):
