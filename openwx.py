@@ -78,12 +78,16 @@ def get_rain_history(wx_data):
 	return rain_history
 
 def get_current_forecast(wx_data, wx_status={}):
-	# *****************************************
-	# Function: Retrieves current weather conditions and forecast
-	# Input: str lat, str long, str api_key
-	# Output: float amount (precipitation inches)
-	# Description:  Get weather data for location
-	# *****************************************
+	"""
+	Retrieves current weather conditions and forecast for a given location.
+
+	:param wx_data: A dictionary containing the latitude, longitude, and API key for the location.
+	:type wx_data: dict
+	:param wx_status: A dictionary containing the current weather status. Default is an empty dictionary.
+	:type wx_status: dict, optional
+	:return: A dictionary containing the current weather status, including the temperature, weather summary, icon, rain amount, and rain forecast.
+	:rtype: dict
+	"""
 	lat = wx_data['lat']
 	long = wx_data['long'] 
 	wx_api_key = wx_data['apikey']
@@ -192,6 +196,12 @@ def get_current_forecast(wx_data, wx_status={}):
 
 
 def main():
+	"""
+	The main program that reads the irrigator.json file, retrieves the current weather and forecast data,
+	and writes the weather status to the wx_status.json file.
+
+	:return: None
+	"""
     # *****************************************************
 	# Main Program
 	# *****************************************************
