@@ -163,19 +163,19 @@ if(json_data_dict['settings']['target_sys'] == "CHIP"):
 	event = "Initializing Relays on CHIP."
 	WriteLog(event)
 	from platform_chip import Platform 
-	platform = Platform(outpins)
+	platform = Platform(outpins, relay_trigger=relay_trigger)
 
 elif(json_data_dict['settings']['target_sys'] == "RasPi"):
 	event = "Initializing Relays on Raspberry Pi."
 	WriteLog(event)
 	from platform_raspi import Platform 
-	platform = Platform(outpins)
+	platform = Platform(outpins, relay_trigger=relay_trigger)
 
 else:
 	event = "Initializing Relays on NONE.  Prototype Mode."
 	WriteLog(event)
 	from platform_prototype import Platform 
-	platform = Platform(outpins)
+	platform = Platform(outpins, relay_trigger=relay_trigger)
 
 # Check weather status
 wx_status, errorcode = checkweather()
