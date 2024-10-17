@@ -49,6 +49,8 @@ def get_rain_history(wx_data):
 
 			if wx_data['units'] == 'F':
 				url += '&units=imperial'
+			else:
+				url += '&units=metric'
 			print(f'  {url}')
 
 			r = requests.get(url)
