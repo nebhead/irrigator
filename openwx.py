@@ -104,6 +104,8 @@ def get_current_forecast(wx_data, wx_status={}):
 		url = f'https://api.openweathermap.org/data/3.0/onecall?lat={lat}&lon={long}&appid={wx_api_key}'
 		if wx_data['units'] == 'F':
 			url += '&units=imperial'
+		else:
+			url += '&units=metric'
 		print(f'  {url}')
 		r = requests.get(url)
 		parsed_json = json.loads(r.text)
