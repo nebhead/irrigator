@@ -1,7 +1,7 @@
 {
-  "global_version": "2026.05.002",
+  "global_version": "2026.05.003",
   "components": {
-    "app": "2026.05.002",
+    "app": "2026.05.003",
     "control": "2026.05.001",
     "weather_api": "2026.05.001"
   }
