@@ -1027,46 +1027,78 @@ def write_restart_script():
 	"""Write a restart script that will be executed after Flask exits"""
 	restart_script_path = '.restart_after_update.sh'
 	script_content = '''#!/bin/bash
-echo "[$(date)] Starting async restart sequence..." >> events.log
+log_event() {
+	printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1" >> events.log
+}
+
+log_event "Starting async restart sequence..."
 sleep 2
 
 # Try supervisorctl first
 if command -v supervisorctl &> /dev/null; then
-	echo "[$(date)] Attempting supervisorctl restart..." >> events.log
-	supervisorctl restart webapp >> events.log 2>&1
-	if [ $? -eq 0 ]; then
-		echo "[$(date)] supervisorctl restart succeeded" >> events.log
+	log_event "Attempting supervisorctl restart..."
+	output=$(supervisorctl restart webapp 2>&1)
+	status=$?
+	if [ -n "$output" ]; then
+		while IFS= read -r line; do
+			log_event "  $line"
+		done <<< "$output"
+	fi
+	if [ $status -eq 0 ]; then
+		log_event "supervisorctl restart succeeded"
 		exit 0
 	fi
 fi
 
 # Try systemctl
 if command -v systemctl &> /dev/null; then
-	echo "[$(date)] Attempting systemctl restart supervisor..." >> events.log
-	systemctl restart supervisor >> events.log 2>&1
-	if [ $? -eq 0 ]; then
-		echo "[$(date)] systemctl restart succeeded" >> events.log
+	log_event "Attempting systemctl restart supervisor..."
+	output=$(systemctl restart supervisor 2>&1)
+	status=$?
+	if [ -n "$output" ]; then
+		while IFS= read -r line; do
+			log_event "  $line"
+		done <<< "$output"
+	fi
+	if [ $status -eq 0 ]; then
+		log_event "systemctl restart succeeded"
 		exit 0
 	fi
 fi
 
 # Try service
 if command -v service &> /dev/null; then
-	echo "[$(date)] Attempting service supervisor restart..." >> events.log
-	service supervisor restart >> events.log 2>&1
-	if [ $? -eq 0 ]; then
-		echo "[$(date)] service restart succeeded" >> events.log
+	log_event "Attempting service supervisor restart..."
+	output=$(service supervisor restart 2>&1)
+	status=$?
+	if [ -n "$output" ]; then
+		while IFS= read -r line; do
+			log_event "  $line"
+		done <<< "$output"
+	fi
+	if [ $status -eq 0 ]; then
+		log_event "service restart succeeded"
 		exit 0
 	fi
 fi
 
 # Final fallback
-echo "[$(date)] All methods failed, killing gunicorn..." >> events.log
+log_event "All methods failed, killing gunicorn..."
 sleep 2
-pkill -TERM -f gunicorn >> events.log 2>&1
+output=$(pkill -TERM -f gunicorn 2>&1)
+if [ -n "$output" ]; then
+	while IFS= read -r line; do
+		log_event "  $line"
+	done <<< "$output"
+fi
 sleep 1
-pkill -9 -f gunicorn >> events.log 2>&1
-echo "[$(date)] Gunicorn killed, supervisord should auto-restart" >> events.log
+output=$(pkill -9 -f gunicorn 2>&1)
+if [ -n "$output" ]; then
+	while IFS= read -r line; do
+		log_event "  $line"
+	done <<< "$output"
+fi
+log_event "Gunicorn killed, supervisord should auto-restart"
 '''
 	try:
 		with open(restart_script_path, 'w') as f:
