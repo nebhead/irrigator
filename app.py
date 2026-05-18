@@ -1023,45 +1023,142 @@ def send_update_message(status, message):
 	except:
 		pass
 
+def write_restart_script():
+	"""Write a restart script that will be executed after Flask exits"""
+	restart_script_path = '.restart_after_update.sh'
+	script_content = '''#!/bin/bash
+echo "[$(date)] Starting async restart sequence..." >> events.log
+sleep 2
+
+# Try supervisorctl first
+if command -v supervisorctl &> /dev/null; then
+	echo "[$(date)] Attempting supervisorctl restart..." >> events.log
+	supervisorctl restart webapp >> events.log 2>&1
+	if [ $? -eq 0 ]; then
+		echo "[$(date)] supervisorctl restart succeeded" >> events.log
+		exit 0
+	fi
+fi
+
+# Try systemctl
+if command -v systemctl &> /dev/null; then
+	echo "[$(date)] Attempting systemctl restart supervisor..." >> events.log
+	systemctl restart supervisor >> events.log 2>&1
+	if [ $? -eq 0 ]; then
+		echo "[$(date)] systemctl restart succeeded" >> events.log
+		exit 0
+	fi
+fi
+
+# Try service
+if command -v service &> /dev/null; then
+	echo "[$(date)] Attempting service supervisor restart..." >> events.log
+	service supervisor restart >> events.log 2>&1
+	if [ $? -eq 0 ]; then
+		echo "[$(date)] service restart succeeded" >> events.log
+		exit 0
+	fi
+fi
+
+# Final fallback
+echo "[$(date)] All methods failed, killing gunicorn..." >> events.log
+sleep 2
+pkill -TERM -f gunicorn >> events.log 2>&1
+sleep 1
+pkill -9 -f gunicorn >> events.log 2>&1
+echo "[$(date)] Gunicorn killed, supervisord should auto-restart" >> events.log
+'''
+	try:
+		with open(restart_script_path, 'w') as f:
+			f.write(script_content)
+		os.chmod(restart_script_path, 0o755)
+		return restart_script_path
+	except Exception as e:
+		WriteLog(f'ERROR: Could not write restart script: {str(e)}')
+		return None
+
+def launch_async_restart():
+	"""Launch the restart script in the background so Flask can exit cleanly"""
+	restart_script = write_restart_script()
+	if not restart_script:
+		return False
+	
+	try:
+		# Launch the script in background, detached from Flask
+		subprocess.Popen(
+			['/bin/bash', restart_script],
+			stdout=subprocess.DEVNULL,
+			stderr=subprocess.DEVNULL,
+			start_new_session=True  # Detach from current process group
+		)
+		WriteLog('Async restart script launched')
+		return True
+	except Exception as e:
+		WriteLog(f'ERROR: Could not launch async restart: {str(e)}')
+		return False
+
 def attempt_restart_webapp():
 	"""Attempt to restart the Flask/gunicorn application via multiple methods"""
+	import time
 	# Since app runs as root, no sudo needed. Try supervisor/systemd restart methods.
 	restart_methods = [
 		('supervisorctl', ['supervisorctl', 'restart', 'webapp']),
-		('systemctl', ['systemctl', 'restart', 'supervisor']),
-		('service', ['service', 'supervisor', 'restart']),
+		('systemctl restart supervisor', ['systemctl', 'restart', 'supervisor']),
+		('service supervisor restart', ['service', 'supervisor', 'restart']),
 	]
+	
+	# First, verify supervisord is running
+	try:
+		send_update_message('running', 'Checking supervisord status...')
+		result = subprocess.run(['supervisorctl', 'status'], capture_output=True, text=True, timeout=5)
+		if result.returncode != 0:
+			send_update_message('warning', 'supervisord may not be running; status check failed')
+		else:
+			send_update_message('running', 'supervisord is responsive')
+	except Exception as e:
+		send_update_message('running', f'Could not verify supervisord: {str(e)}')
 	
 	for method_name, command in restart_methods:
 		try:
 			send_update_message('running', f'Attempting restart via {method_name}...')
 			result = subprocess.run(command, capture_output=True, text=True, timeout=15)
+			stdout = result.stdout.strip() if result.stdout else ''
+			stderr = result.stderr.strip() if result.stderr else ''
 			
 			if result.returncode == 0:
 				send_update_message('running', f'✓ {method_name} restart initiated')
+				if stdout:
+					send_update_message('running', f'  Output: {stdout[:200]}')
+				time.sleep(2)  # Give supervisor time to restart
 				return True
 			else:
-				error_msg = result.stderr.strip() or result.stdout.strip()
-				send_update_message('running', f'✗ {method_name} failed: {error_msg}')
+				error_detail = stderr or stdout or 'unknown error'
+				send_update_message('running', f'✗ {method_name} returned {result.returncode}: {error_detail[:200]}')
 				continue
 		except subprocess.TimeoutExpired:
 			send_update_message('running', f'✗ {method_name} timed out')
 			continue
 		except FileNotFoundError:
-			send_update_message('running', f'✗ {method_name} not available')
+			send_update_message('running', f'✗ {method_name} not available on this system')
 			continue
 		except Exception as e:
-			send_update_message('running', f'✗ {method_name} error: {str(e)}')
+			send_update_message('running', f'✗ {method_name} exception: {str(e)}')
 			continue
 	
-	# Final fallback: kill gunicorn processes and hope supervisord restarts them
+	# Final fallback: kill gunicorn process - supervisord autorestart should handle restart
 	try:
-		send_update_message('running', 'Using fallback: killing gunicorn process...')
-		result = subprocess.run(['pkill', '-9', '-f', 'gunicorn'], capture_output=True, timeout=5)
-		send_update_message('running', '✓ Gunicorn killed, supervisord should restart it')
+		send_update_message('running', 'All restart methods exhausted. Using fallback: killing gunicorn...')
+		result = subprocess.run(['pkill', '-TERM', '-f', 'gunicorn'], capture_output=True, timeout=5)
+		send_update_message('running', 'Gunicorn termination signal sent')
+		time.sleep(3)  # Give supervisord time to notice and restart
+		# Double-check with a harder kill if needed
+		subprocess.run(['pkill', '-9', '-f', 'gunicorn'], capture_output=True, timeout=2)
+		send_update_message('running', '✓ Fallback: gunicorn terminated, supervisord autorestart should engage')
+		time.sleep(2)  # Final pause for restart
 		return True
 	except Exception as e:
 		send_update_message('error', f'All restart methods failed: {str(e)}')
+		WriteLog(f'ERROR: Update succeeded but could not restart app: {str(e)}')
 		return False
 
 def perform_update_background():
@@ -1110,15 +1207,27 @@ def perform_update_background():
 		else:
 			send_update_message('error', 'Failed to update version metadata')
 		
-		# Restart Flask app
-		send_update_message('running', 'Restarting Flask application...')
-		if attempt_restart_webapp():
+		# Validate Python syntax before restart
+		send_update_message('running', 'Validating Python syntax...')
+		try:
+			import py_compile
+			py_compile.compile('app.py', doraise=True)
+			send_update_message('running', '✓ Python syntax validation passed')
+		except py_compile.PyCompileError as e:
+			send_update_message('error', f'Python syntax error in updated files: {str(e)}')
+			WriteLog(f'ERROR: Syntax error in updated app.py: {str(e)}')
+			update_in_progress = False
+			return
+		
+		# Restart Flask app using async script
+		# This gives Flask thread time to fully exit before restart is attempted
+		send_update_message('running', 'Preparing application restart...')
+		if launch_async_restart():
 			send_update_message('success', 'Update complete! Application restarting...')
-			# Log the successful update
 			WriteLog(f'Update completed successfully: {local_version} -> {manifest_version}')
 		else:
 			send_update_message('error', 'Could not restart application. Manual restart may be required.')
-			WriteLog(f'Update completed but restart failed: {local_version} -> {manifest_version}')
+			WriteLog(f'Update completed but restart script failed: {local_version} -> {manifest_version}')
 	except Exception as e:
 		send_update_message('error', f'Unexpected error: {str(e)}')
 		update_in_progress = False
