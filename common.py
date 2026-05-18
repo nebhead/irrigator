@@ -13,6 +13,8 @@ import json
 import datetime
 import io
 import re
+import os
+import tempfile
 from cron_descriptor import get_description, ExpressionDescriptor
 
 VERSION_MANIFEST_FILENAME = "manifest.json"
@@ -25,59 +27,80 @@ VERSION_COMPONENT_LABELS = {
 
 # Control uses this
 def ReadJSON(json_data_filename="irrigator.json", type="settings"):
-    try:
-        json_data_file = open(json_data_filename, 'r')
-        json_data_string = json_data_file.read()
-        json_data_dict = json.loads(json_data_string)
-        json_data_file.close()
-    except(IOError, OSError):
-		# File not found, write defaults
-        event = f"Exception occurred when reading {json_data_filename}.  File not found.  Creating the file with default settings."
-        WriteLog(event)
-        if type == 'weather': 
-            json_data_dict = create_wx_json()
-            WriteJSON(json_data_dict, json_data_filename='wx_status.json')
-        else: 
-            json_data_dict = create_json()
-            WriteJSON(json_data_dict)
-    except(ValueError):
-		# A ValueError Exception occurs when multiple accesses collide, this code attempts a retry.
-        event = f'Exception occurred when reading {json_data_filename}.  Value Error Exception - JSONDecodeError.  Retrying.'
-        WriteLog(event)
-        json_data_file.close()
-		# Retry Reading JSON
-        json_data_dict = ReadJSON(json_data_filename, type)
+	max_attempts = 5
+	retry_delay_seconds = 0.1
+	last_error = None
 
-    if type == 'settings':
-        # Check relay trigger which was added post-initial release 
-        if 'relay_trigger' not in json_data_dict['settings'].keys():
-            relay_trigger = 0  # Set default to active low (0) triggered relays 
-            json_data_dict['settings']['relay_trigger'] = 0  # set the default to active low (0) triggered in settings, and save
-            WriteJSON(json_data_dict)
-        # Check if history and forecast days are set
-        if 'history_days' not in json_data_dict['wx_data']:
-            json_data_dict['wx_data']['history_days'] = 2 
-            json_data_dict['wx_data']['forecast_days'] = 2
-            WriteJSON(json_data_dict)
-            wx_data = create_wx_json()
-            WriteJSON(wx_data, json_data_filename='wx_status.json')
-        # Check if metadata section exists (version tracking for updates)
-        if 'metadata' not in json_data_dict:
-            manifest_data = ReadVersionManifest()
-            current_version = manifest_data.get('global_version', DEFAULT_VERSION)
-            json_data_dict['metadata'] = {
-                'version': current_version,
-                'last_updated': datetime.datetime.now().isoformat()
-            }
-            WriteJSON(json_data_dict)
-    
-    return(json_data_dict)
+	for attempt in range(max_attempts):
+		try:
+			with open(json_data_filename, 'r') as json_data_file:
+				json_data_dict = json.loads(json_data_file.read())
+			break
+		except FileNotFoundError:
+			# File not found, create defaults atomically and return them.
+			event = f"Exception occurred when reading {json_data_filename}.  File not found.  Creating the file with default settings."
+			WriteLog(event)
+			if type == 'weather': 
+				json_data_dict = create_wx_json()
+				WriteJSON(json_data_dict, json_data_filename='wx_status.json')
+			else: 
+				json_data_dict = create_json()
+				WriteJSON(json_data_dict)
+			break
+		except (OSError, ValueError) as e:
+			# A ValueError Exception occurs when multiple accesses collide; retry a few times before giving up.
+			last_error = e
+			event = f'Exception occurred when reading {json_data_filename}.  JSON read failed on attempt {attempt + 1}/{max_attempts}. Retrying.'
+			WriteLog(event)
+			if attempt == max_attempts - 1:
+				raise
+			time.sleep(retry_delay_seconds * (attempt + 1))
+
+	if last_error is not None:
+		raise last_error
+
+	if type == 'settings':
+		# Check relay trigger which was added post-initial release 
+		if 'relay_trigger' not in json_data_dict['settings'].keys():
+			relay_trigger = 0  # Set default to active low (0) triggered relays 
+			json_data_dict['settings']['relay_trigger'] = 0  # set the default to active low (0) triggered in settings, and save
+			WriteJSON(json_data_dict)
+		# Check if history and forecast days are set
+		if 'history_days' not in json_data_dict['wx_data']:
+			json_data_dict['wx_data']['history_days'] = 2 
+			json_data_dict['wx_data']['forecast_days'] = 2
+			WriteJSON(json_data_dict)
+			wx_data = create_wx_json()
+			WriteJSON(wx_data, json_data_filename='wx_status.json')
+		# Check if metadata section exists (version tracking for updates)
+		if 'metadata' not in json_data_dict:
+			manifest_data = ReadVersionManifest()
+			current_version = manifest_data.get('global_version', DEFAULT_VERSION)
+			json_data_dict['metadata'] = {
+				'version': current_version,
+				'last_updated': datetime.datetime.now().isoformat()
+			}
+			WriteJSON(json_data_dict)
+
+	return(json_data_dict)
 
 # Control uses this
 def WriteJSON(json_data_dict, json_data_filename="irrigator.json"):
 	json_data_string = json.dumps(json_data_dict, indent=2)
-	with open(json_data_filename, 'w') as settings_file:
-	    settings_file.write(json_data_string)
+	json_dir = os.path.dirname(os.path.abspath(json_data_filename)) or '.'
+	fd, temp_path = tempfile.mkstemp(prefix='.irrigator.', suffix='.tmp', dir=json_dir)
+	try:
+		with os.fdopen(fd, 'w') as settings_file:
+			settings_file.write(json_data_string)
+			settings_file.flush()
+			os.fsync(settings_file.fileno())
+		os.replace(temp_path, json_data_filename)
+	except Exception:
+		try:
+			os.remove(temp_path)
+		except OSError:
+			pass
+		raise
 
 def WriteLog(event):
 	# *****************************************
