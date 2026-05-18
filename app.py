@@ -743,11 +743,31 @@ def readeventlog():
 	# Initialize event_list list
 	event_list = []
 
+	def parse_event_line(event_line):
+		event_line = event_line.rstrip('\n')
+
+		match = re.match(r'^\[(?P<dow>\w{3})\s+(?P<day>\d{1,2})\s+(?P<mon>\w{3})\s+(?P<time>\d{2}:\d{2}:\d{2})\s+(?P<tz>\S+)\s+(?P<year>\d{4})\]\s*(?P<event>.*)$', event_line)
+		if match:
+			try:
+				date_value = datetime.datetime.strptime(
+					f"{match.group('day')} {match.group('mon')} {match.group('year')}",
+					"%d %b %Y"
+				).strftime('%Y-%m-%d')
+			except ValueError:
+				date_value = f"{match.group('day')} {match.group('mon')} {match.group('year')}"
+			return [date_value, match.group('time'), match.group('event').strip()]
+
+		match = re.match(r'^(?P<date>\d{4}-\d{2}-\d{2})\s+(?P<time>\d{2}:\d{2}:\d{2})(?:\.\d+)?\s*(?P<event>.*)$', event_line)
+		if match:
+			return [match.group('date'), match.group('time'), match.group('event').strip()]
+
+		return ['--------', '--:--:--', event_line.strip()]
+
 	# Get number of events
 	num_events = len(event_lines)
 
 	for x in range(num_events):
-		event_list.append(event_lines[x].split(" ",2))
+		event_list.append(parse_event_line(event_lines[x]))
 
 	# Error handling if number of events is less than 20, fill array with empty
 	if (num_events < 20):
