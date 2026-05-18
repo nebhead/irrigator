@@ -72,7 +72,7 @@ echo "**      Installing Dependancies... (This could take several minutes)   **"
 echo "**                                                                     **"
 echo "*************************************************************************"
 $SUDO apt install python3-dev python3-rpi.gpio python3-pip nginx git gunicorn3 supervisor -y
-$SUDO pip3 install flask python-crontab cron-descriptor requests geopy
+$SUDO pip3 install flask python-crontab cron-descriptor requests geopy paho-mqtt
 
 # Grab project files
 clear

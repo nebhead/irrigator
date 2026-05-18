@@ -107,6 +107,17 @@
         <b> Weather Settings Modification Failed.</b><br>
         <i><b>Detail: </b>{{ detail }}</i>
       </div>
+    {% elif (action == "mqtt") and (success==True) %}
+      <div class="alert alert-success" role="alert">
+        <span class="glyphicon glyphicon-ok"></span>
+        <b> MQTT Settings Modified Successfully.</b>
+      </div>
+    {% elif (action == "mqtt") and (success==False) %}
+      <div class="alert alert-danger" role="alert">
+        <span class="glyphicon glyphicon-remove"></span>
+        <b> MQTT Settings Modification Failed.</b><br>
+        <i><b>Detail: </b>{{ detail }}</i>
+      </div>
     {% endif %}
 
     <!-- Weather Settings -->
@@ -302,6 +313,80 @@
         <button type="submit" class="btn btn-default">Save Settings</button>
       </div>
     </div> <!-- End of Panel Group System Settings -->
+    </form>
+
+    <!-- MQTT Settings -->
+    <form name="input_mqtt" action="/settings/mqtt" method="POST">
+    <div class="panel panel-primary">
+      <div class="panel-heading">
+        <h3 class="panel-title"> MQTT Settings (Home Assistant Integration)
+          <span class="glyphicon glyphicon-transfer pull-right"></span>
+        </h3>
+      </div>
+      <div class="panel-body">
+        <!-- Enable MQTT -->
+        <div class="checkbox checkbox-slider-md checkbox-slider--b checkbox-slider-info">
+          <label>
+            {% if jdict.get('mqtt', {}).get('enabled', False) == True %}
+              <input type="checkbox" name="mqtt_enabled" checked><span><b>Enable MQTT (Home Assistant Integration)</b></span>
+            {% else %}
+              <input type="checkbox" name="mqtt_enabled" unchecked><span><b>Enable MQTT (Home Assistant Integration)</b></span>
+            {% endif %}
+          </label>
+        </div>
+        <br>
+
+        <!-- MQTT Server -->
+        <div class="row">
+          <div class="col-xs-6">
+            <label for="mqtt_server"><span class="glyphicon glyphicon-globe"></span>&nbsp; MQTT Server/Host: </label>
+            <input type="text" class="form-control" id="mqtt_server" name="mqtt_server" placeholder="mqtt.example.com or 192.168.1.100" value="{{ jdict.get('mqtt', {}).get('server', '') }}">
+          </div>
+        </div>
+        <br>
+
+        <!-- MQTT Port -->
+        <div class="row">
+          <div class="col-xs-6">
+            <label for="mqtt_port"><span class="glyphicon glyphicon-plug"></span>&nbsp; MQTT Port: </label>
+            <input type="number" min="1" max="65535" class="form-control" id="mqtt_port" name="mqtt_port" placeholder="1883" value="{{ jdict.get('mqtt', {}).get('port', 1883) }}">
+          </div>
+        </div>
+        <br>
+
+        <!-- MQTT Username -->
+        <div class="row">
+          <div class="col-xs-6">
+            <label for="mqtt_username"><span class="glyphicon glyphicon-user"></span>&nbsp; MQTT Username (optional): </label>
+            <input type="text" class="form-control" id="mqtt_username" name="mqtt_username" placeholder="Leave blank if no authentication" value="{{ jdict.get('mqtt', {}).get('username', '') }}">
+          </div>
+        </div>
+        <br>
+
+        <!-- MQTT Password -->
+        <div class="row">
+          <div class="col-xs-6">
+            <label for="mqtt_password"><span class="glyphicon glyphicon-lock"></span>&nbsp; MQTT Password (optional): </label>
+            <input type="password" class="form-control" id="mqtt_password" name="mqtt_password" placeholder="Leave blank if no authentication" value="{{ jdict.get('mqtt', {}).get('password', '') }}">
+          </div>
+        </div>
+        <br>
+
+        <!-- MQTT Topic Prefix -->
+        <div class="row">
+          <div class="col-xs-6">
+            <label for="mqtt_prefix"><span class="glyphicon glyphicon-tag"></span>&nbsp; Topic Prefix: </label>
+            <input type="text" class="form-control" id="mqtt_prefix" name="mqtt_prefix" placeholder="irrigator" value="{{ jdict.get('mqtt', {}).get('topic_prefix', 'irrigator') }}">
+          </div>
+        </div>
+        <br>
+        <i><b>NOTE:</b> Zone and schedule commands will be published to <code>&lt;prefix&gt;/zone/&lt;zone_name&gt;</code> and <code>&lt;prefix&gt;/schedule/&lt;schedule_name&gt;</code>. Status is published automatically when MQTT is enabled.</i>
+
+      </div> <!-- end body -->
+      <div class="panel-footer">
+        <button type="submit" class="btn btn-default">Save Settings</button>
+      </div>
+    </div> <!-- End of Panel Group MQTT Settings -->
     </form>
 
     <!-- Zone Settings -->

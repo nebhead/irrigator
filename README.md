@@ -171,7 +171,7 @@ Save and exit.
 ```
 sudo apt update
 sudo apt install python3-dev python3-pip python3-rpi.gpio nginx git gunicorn supervisor -y
-sudo pip install flask python-crontab cron-descriptor requests geopy
+sudo pip install flask python-crontab cron-descriptor requests geopy paho-mqtt
 git clone https://github.com/nebhead/irrigator
 ```
 #### Setup nginx to proxy to gunicorn
@@ -278,7 +278,7 @@ You’ll get a large menu to select locales. Use the arrow keys to scroll down a
 
 >git clone https://github.com/nebhead/irrigator
 
->sudo pip install flask python-crontab cron-descriptor
+>sudo pip install flask python-crontab cron-descriptor paho-mqtt
 
 ### Install CHIP IO
 

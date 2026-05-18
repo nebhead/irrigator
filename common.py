@@ -194,6 +194,16 @@ def create_json():
         'relay_trigger' : 0    # 0 for active low relays, 1 for active high relays 
     }
 
+    irrigator['mqtt'] = {
+        'enabled': False,
+        'server': '',
+        'port': 1883,
+        'username': '',
+        'password': '',
+        'topic_prefix': 'irrigator',
+        'last_connected': None
+    }
+
     irrigator['wx_data'] = {
         'apikey': '123456789abcdefghijklmnopqrstuvxyz', # OpenWeatherMap APIkey
         'lat': '44.0611151',
@@ -615,6 +625,46 @@ def UpdateMetadata(new_version):
 		WriteLog(f"Exception updating metadata: {str(e)}")
 		return False
 
+def upgrade_mqtt_2026_05_003():
+	"""
+	Install MQTT bridge for Home Assistant integration.
+	- Install paho-mqtt via pip
+	- Copy mqtt.conf to supervisord directory
+	- Reload supervisord to register new process
+	"""
+	try:
+		WriteLog("Upgrade: Installing MQTT dependencies...")
+		
+		# Install paho-mqtt
+		result = os.system("pip3 install paho-mqtt")
+		if result != 0:
+			raise Exception("pip3 install paho-mqtt failed")
+		
+		WriteLog("✓ MQTT dependencies installed")
+		
+		# Copy supervisord config
+		WriteLog("Upgrade: Deploying supervisord MQTT config...")
+		conf_src = "/usr/local/bin/irrigator/auto-install/supervisor/mqtt.conf"
+		conf_dst = "/etc/supervisor/conf.d/mqtt.conf"
+		
+		if os.path.exists(conf_src):
+			os.system(f"sudo cp {conf_src} {conf_dst}")
+		else:
+			raise Exception(f"Source config not found: {conf_src}")
+		
+		WriteLog("✓ Supervisord config deployed")
+		
+		# Reload supervisord
+		WriteLog("Upgrade: Reloading supervisord...")
+		os.system("sudo supervisorctl reread")
+		os.system("sudo supervisorctl update")
+		
+		WriteLog("✓ Supervisord reloaded; MQTT process registered")
+		
+	except Exception as e:
+		WriteLog(f"MQTT upgrade failed: {str(e)}")
+		raise
+
 def RunUpgradePath(old_version, new_version):
 	"""
 	Execute upgrade/migration logic based on version comparison
@@ -648,9 +698,7 @@ def RunUpgradePath(old_version, new_version):
 	# List of upgrade steps by version
 	# Format: (version_tuple, function, description)
 	upgrade_steps = [
-		# Example for future use:
-		# ((2026, 5, 2), upgrade_2026_05_002, "Crontab sync"),
-		# ((2026, 6, 0), upgrade_2026_06_000, "New feature setup"),
+		((2026, 5, 3), upgrade_mqtt_2026_05_003, "MQTT bridge installation"),
 	]
 	
 	# Execute each upgrade step that falls between old_version and new_version

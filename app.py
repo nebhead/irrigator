@@ -649,6 +649,50 @@ def settings(action=None):
 			print('Success:  Writing JSON data to file.')
 			WriteJSON(json_data_dict) 
 
+	elif (request.method == 'POST') and (action == 'mqtt'):
+		success = True
+		detail = ""
+		response = request.form
+
+		if ('mqtt_enabled' in response):
+			if (response['mqtt_enabled'] == 'on'):
+				json_data_dict['mqtt']['enabled'] = True
+			else:
+				json_data_dict['mqtt']['enabled'] = False
+
+		if (response.get('mqtt_enabled') == 'on'):
+			# Validate required fields if MQTT is enabled
+			if ('mqtt_server' in response) and response['mqtt_server']:
+				json_data_dict['mqtt']['server'] = str(response['mqtt_server'])
+			else:
+				success = False
+				detail = "MQTT Server is required when enabled."
+
+			if ('mqtt_port' in response) and response['mqtt_port']:
+				try:
+					port_val = int(response['mqtt_port'])
+					if 1 <= port_val <= 65535:
+						json_data_dict['mqtt']['port'] = port_val
+					else:
+						success = False
+						detail = "MQTT Port must be between 1 and 65535."
+				except:
+					success = False
+					detail = "MQTT Port must be a valid number."
+
+		if ('mqtt_username' in response):
+			json_data_dict['mqtt']['username'] = str(response['mqtt_username'])
+
+		if ('mqtt_password' in response):
+			json_data_dict['mqtt']['password'] = str(response['mqtt_password'])
+
+		if ('mqtt_prefix' in response) and response['mqtt_prefix']:
+			json_data_dict['mqtt']['topic_prefix'] = str(response['mqtt_prefix'])
+
+		if(success==True):
+			print('Success:  Writing MQTT settings to file.')
+			WriteJSON(json_data_dict)
+
 	return render_template('settings.html', jdict=json_data_dict, action=action, success=success, detail=detail)
 
 @app.route('/admin/<action>')
