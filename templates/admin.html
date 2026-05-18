@@ -501,15 +501,15 @@
             $('#progress_text').text('Complete');
             $('#update_status_final').show();
             $('#update_status_final').css('background-color', '#d4edda');
-            $('#update_final_message').html('<strong>Update completed successfully!</strong><br>The application is restarting...<br><br><em>Redirecting in 5 seconds...</em>');
+            $('#update_final_message').html('<strong>Update completed successfully!</strong><br>The application is restarting...<br><br><em>Redirecting in 30 seconds...</em>');
             $('#close_progress_btn').show();
             event_source.close();
             update_in_progress = false;
 
-            // Redirect after 5 seconds
+            // Redirect after 30 seconds
             setTimeout(function() {
               window.location.href = '/admin';
-            }, 5000);
+            }, 30000); // Increased to 30 seconds for reliable restart
           } else if (message.status === 'error') {
             $('#progress_bar').removeClass('progress-bar-striped active');
             $('#progress_text').text('Error');
