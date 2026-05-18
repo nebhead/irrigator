@@ -8,3 +8,7 @@ irrigator.json
 __pycache__/
 
 local/
+
+.skills/
+
+.github/

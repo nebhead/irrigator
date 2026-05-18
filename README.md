@@ -25,6 +25,19 @@ I've done a little big of clean-up to the code, modernizing it to use Python 3.x
 
 Initially this project used Flask's native WSGI services without Gunicorn or nginx as a proxy.  However, I noticed that after some time, the app would become unresponsive.  After a little research, it appears that Flask's built in web server is for testing purposes only and shouldn't really be used in production.  With that said, I'm using Gunicorn and nginx to proxy web resquests.  This is simple enough to configure and setup, however I had to redesign the application without the threading libraries, due to conflicts with Gunicorn.  Instead, I am using two processes running concurrently (control.py and app.py).  Control handles all of the RasPi GPIO interfaces, while App handles the web routes.  They communicate through a JSON file.
 
+## Software Versioning
+
+IrriGator stores release versions in the root [manifest.json](manifest.json).  This file is the single source of truth for the global application version and the per-component versions for the Flask web application, the control application, and the weather API application.
+
+Version numbers follow the `YYYY.MM.BBB` format, where `BBB` is a sequential build number for that year and month.  The build number is maintained manually in the root manifest, so updating a release version only requires changing one file before committing to git.
+
+The application reads the root manifest at runtime to:
+
+* Write versioned startup entries to `events.log` for the web application, control application, and weather API application.
+* Show the global version and component versions on the Admin page.
+
+The root manifest is separate from [templates/manifest.json](templates/manifest.json).  The template file is only used for the browser web-app manifest and should not be used for release versioning.
+
 ## Hardware Configuration
 
 The hardware configuration for this project is relatively simple if you have an existing sprinkler system installed.  The setup of the sprinklers, the solenoids, and the wiring back to your panel is not in scope of this guide.  The focus here is to provide you with instructions on one working configuration. 

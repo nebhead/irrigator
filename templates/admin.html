@@ -71,6 +71,34 @@
       <div class="panel-body">{{ uptime }}</div>
     </div>
 
+    <div class="panel panel-primary">
+      <div class="panel-heading">
+        <h3 class="panel-title">Software Versions</h3>
+      </div>
+      <div class="panel-body">
+        <table class="table table-striped table-condensed">
+          <thead>
+            <tr>
+              <th>Component</th>
+              <th>Version</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Global Version</strong></td>
+              <td>{{ version_manifest['global_version'] }}</td>
+            </tr>
+            {% for component_name, component_data in version_manifest['components'].items() %}
+            <tr>
+              <td>{{ component_data['label'] }}</td>
+              <td>{{ component_data['version'] }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
 
     <div class="panel panel-primary">
       <div class="panel-heading">

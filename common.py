@@ -12,7 +12,16 @@ import time
 import json
 import datetime
 import io
+import re
 from cron_descriptor import get_description, ExpressionDescriptor
+
+VERSION_MANIFEST_FILENAME = "manifest.json"
+DEFAULT_VERSION = "0000.00.000"
+VERSION_COMPONENT_LABELS = {
+    'app': 'Flask Web Application',
+    'control': 'Control Application',
+    'weather_api': 'Weather API Application'
+}
 
 # Control uses this
 def ReadJSON(json_data_filename="irrigator.json", type="settings"):
@@ -74,6 +83,70 @@ def WriteLog(event):
 	logfile = open("events.log", "a")
 	logfile.write(now + ' ' + event + '\n')
 	logfile.close()
+
+def version_format_is_valid(version_string):
+    return bool(re.match(r'^\d{4}\.\d{2}\.\d{3}$', str(version_string)))
+
+def create_version_manifest(global_version=DEFAULT_VERSION):
+    components = {}
+    for component_name in VERSION_COMPONENT_LABELS:
+        components[component_name] = global_version
+
+    return {
+        'global_version': global_version,
+        'components': components
+    }
+
+def ReadVersionManifest(manifest_filename=VERSION_MANIFEST_FILENAME):
+    try:
+        with open(manifest_filename, 'r') as manifest_file:
+            manifest_data = json.loads(manifest_file.read())
+    except(IOError, OSError):
+        event = f"Exception occurred when reading {manifest_filename}. File not found. Using default version manifest."
+        WriteLog(event)
+        manifest_data = create_version_manifest()
+    except(ValueError):
+        event = f"Exception occurred when reading {manifest_filename}. Value Error Exception - JSONDecodeError. Using default version manifest."
+        WriteLog(event)
+        manifest_data = create_version_manifest()
+
+    global_version = manifest_data.get('global_version', DEFAULT_VERSION)
+    if version_format_is_valid(global_version) == False:
+        global_version = DEFAULT_VERSION
+
+    components = {}
+    manifest_components = manifest_data.get('components', {})
+    for component_name, component_label in VERSION_COMPONENT_LABELS.items():
+        component_version = manifest_components.get(component_name, global_version)
+        if version_format_is_valid(component_version) == False:
+            component_version = global_version
+        components[component_name] = {
+            'label': component_label,
+            'version': component_version
+        }
+
+    return {
+        'global_version': global_version,
+        'components': components
+    }
+
+def GetComponentVersion(component_name, manifest_data=None):
+    if manifest_data is None:
+        manifest_data = ReadVersionManifest()
+
+    component_data = manifest_data.get('components', {}).get(component_name, {})
+    return component_data.get('version', manifest_data.get('global_version', DEFAULT_VERSION))
+
+def WriteStartupVersionLog(component_name, component_label=None, manifest_data=None):
+    if manifest_data is None:
+        manifest_data = ReadVersionManifest()
+
+    if component_label is None:
+        component_label = VERSION_COMPONENT_LABELS.get(component_name, component_name)
+
+    version = GetComponentVersion(component_name, manifest_data)
+    event = f"***** {component_label} Starting - Version {version} *****"
+    WriteLog(event)
 
 def create_json():
     irrigator = {}

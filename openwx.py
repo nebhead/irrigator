@@ -23,7 +23,7 @@ from datetime import datetime
 import json
 import requests
 from geopy.geocoders import Nominatim
-from common import ReadJSON, WriteJSON, WriteLog
+from common import ReadJSON, WriteJSON, WriteLog, WriteStartupVersionLog
 
 def get_rain_history(wx_data):
 	"""
@@ -209,6 +209,7 @@ def main():
     # *****************************************************
 	# Main Program
 	# *****************************************************
+	WriteStartupVersionLog('weather_api')
 
 	#Read irrigator.json
 	irrigator = ReadJSON('irrigator.json')

@@ -96,8 +96,7 @@ def checkweather():
 #   -j [filename]	JSON File  	Alternate JSON File [default: irrigator.json]
 #	-s [schedule]   Schedule	Auto Mode: Select Schedule Run [name]
 
-event = "***** Control Script Starting *****"
-WriteLog(event)
+WriteStartupVersionLog('control')
 
 # Parse Input Arguments
 parser = argparse.ArgumentParser(description='Irrigator - Sprinkler Zone Control Script.  Usage as follows: ')

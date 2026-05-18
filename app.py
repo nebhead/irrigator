@@ -21,6 +21,15 @@ from common import *
 pathtoirrigator = "/usr/local/bin/irrigator"
 
 app = Flask(__name__)
+app_startup_logged = False
+
+def log_app_startup():
+	global app_startup_logged
+	if(app_startup_logged == False):
+		WriteStartupVersionLog('app')
+		app_startup_logged = True
+
+log_app_startup()
 
 @app.route('/<action>', methods=['POST','GET'])
 @app.route('/', methods=['POST','GET'])
@@ -671,8 +680,9 @@ def admin(action=None):
 	uptime = os.popen('uptime').readline()
 
 	cpuinfo = os.popen('cat /proc/cpuinfo').readlines()
+	version_manifest = ReadVersionManifest()
 
-	return render_template('admin.html', action=action, uptime=uptime, cpuinfo=cpuinfo)
+	return render_template('admin.html', action=action, uptime=uptime, cpuinfo=cpuinfo, version_manifest=version_manifest)
 
 @app.route('/eventlog')
 def eventlog():
