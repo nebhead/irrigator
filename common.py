@@ -61,6 +61,15 @@ def ReadJSON(json_data_filename="irrigator.json", type="settings"):
             WriteJSON(json_data_dict)
             wx_data = create_wx_json()
             WriteJSON(wx_data, json_data_filename='wx_status.json')
+        # Check if metadata section exists (version tracking for updates)
+        if 'metadata' not in json_data_dict:
+            manifest_data = ReadVersionManifest()
+            current_version = manifest_data.get('global_version', DEFAULT_VERSION)
+            json_data_dict['metadata'] = {
+                'version': current_version,
+                'last_updated': datetime.datetime.now().isoformat()
+            }
+            WriteJSON(json_data_dict)
     
     return(json_data_dict)
 
@@ -323,3 +332,247 @@ def is_raspberry_pi():
 	except Exception:
 		pass
 	return False
+
+
+# ************************************************************
+# Update System Functions
+# ************************************************************
+
+def is_git_repo():
+	"""
+	Check if the current directory is a git repository
+	:return: True if .git directory exists, False otherwise
+	"""
+	import os
+	return os.path.isdir('.git')
+
+def get_local_version():
+	"""
+	Get the local version from irrigator.json metadata, fallback to manifest.json
+	:return: version string (YYYY.MM.BBB format)
+	"""
+	try:
+		irrigator_data = ReadJSON(json_data_filename="irrigator.json", type="settings")
+		if 'metadata' in irrigator_data and 'version' in irrigator_data['metadata']:
+			return irrigator_data['metadata']['version']
+	except Exception as e:
+		WriteLog(f"Exception getting local version from irrigator.json: {str(e)}")
+	
+	# Fallback to manifest
+	manifest_data = ReadVersionManifest()
+	return manifest_data.get('global_version', DEFAULT_VERSION)
+
+def get_remote_commit_count():
+	"""
+	Get the number of commits behind origin/main
+	:return: int count of commits behind, or error string if not a git repo
+	"""
+	if not is_git_repo():
+		return {'error': 'Not a git repository'}
+	
+	try:
+		import subprocess
+		# Fetch to get latest remote info
+		subprocess.run(['git', 'fetch', 'origin', 'main', '--dry-run'], 
+					   capture_output=True, timeout=15)
+		
+		# Count commits: how many commits are on origin/main but not on HEAD
+		result = subprocess.run(['git', 'rev-list', 'origin/main', '^HEAD'],
+							   capture_output=True, text=True, timeout=10)
+		
+		if result.returncode == 0:
+			lines = result.stdout.strip().split('\n')
+			count = len([l for l in lines if l.strip()])
+			return count
+		else:
+			return {'error': 'Failed to count commits: ' + result.stderr}
+	except subprocess.TimeoutExpired:
+		return {'error': 'Git command timed out'}
+	except Exception as e:
+		return {'error': f'Exception: {str(e)}'}
+
+def get_commits_since_local():
+	"""
+	Get list of commits on origin/main that are not on local HEAD
+	:return: list of dicts with {hash, title, body}, or error dict
+	"""
+	if not is_git_repo():
+		return {'error': 'Not a git repository'}
+	
+	try:
+		import subprocess
+		# Fetch to get latest remote info (dry-run to avoid modifying state)
+		subprocess.run(['git', 'fetch', 'origin', 'main', '--dry-run'],
+					   capture_output=True, timeout=15)
+		
+		# Get commits: origin/main but not HEAD, with custom format
+		# Format: hash|title|body (separated by |, newline between commits)
+		result = subprocess.run(
+			['git', 'log', 'origin/main', '^HEAD', '--pretty=format:%H|%s|%b===COMMIT_END==='],
+			capture_output=True, text=True, timeout=10
+		)
+		
+		if result.returncode != 0:
+			return {'error': 'Failed to get commits: ' + result.stderr}
+		
+		commits = []
+		commit_blocks = result.stdout.split('===COMMIT_END===')
+		
+		for block in commit_blocks:
+			if not block.strip():
+				continue
+			parts = block.strip().split('|', 2)
+			if len(parts) >= 2:
+				commits.append({
+					'hash': parts[0].strip(),
+					'title': parts[1].strip(),
+					'body': parts[2].strip() if len(parts) > 2 else ''
+				})
+		
+		return commits
+	except subprocess.TimeoutExpired:
+		return {'error': 'Git command timed out'}
+	except Exception as e:
+		return {'error': f'Exception: {str(e)}'}
+
+def perform_git_update():
+	"""
+	Perform git update: fetch origin/main and merge with local changes
+	Uses 'git merge -X theirs' to force remote changes over local in case of conflicts
+	:return: dict with {success: bool, message: str, output: str}
+	"""
+	if not is_git_repo():
+		return {
+			'success': False,
+			'message': 'Not a git repository',
+			'output': 'Error: .git directory not found'
+		}
+	
+	try:
+		import subprocess
+		output_lines = []
+		
+		# Step 1: Fetch from remote
+		output_lines.append('[1/3] Fetching from origin/main...')
+		result = subprocess.run(['git', 'fetch', 'origin', 'main'],
+							   capture_output=True, text=True, timeout=30)
+		if result.returncode != 0:
+			return {
+				'success': False,
+				'message': 'Fetch failed',
+				'output': '\n'.join(output_lines) + '\nError: ' + result.stderr
+			}
+		output_lines.append('✓ Fetch successful')
+		
+		# Step 2: Merge with -X theirs strategy (remote wins on conflicts)
+		output_lines.append('[2/3] Merging origin/main...')
+		result = subprocess.run(['git', 'merge', '-X', 'theirs', 'origin/main'],
+							   capture_output=True, text=True, timeout=30)
+		if result.returncode != 0:
+			return {
+				'success': False,
+				'message': 'Merge failed',
+				'output': '\n'.join(output_lines) + '\nError: ' + result.stderr
+			}
+		output_lines.append('✓ Merge successful')
+		
+		# Step 3: Clean up any untracked files (optional, just log if any exist)
+		output_lines.append('[3/3] Cleaning up...')
+		result = subprocess.run(['git', 'status', '--porcelain'],
+							   capture_output=True, text=True, timeout=10)
+		if result.stdout.strip():
+			output_lines.append('Note: Repository has local modifications after merge')
+		output_lines.append('✓ Update complete')
+		
+		return {
+			'success': True,
+			'message': 'Update successful',
+			'output': '\n'.join(output_lines)
+		}
+	except subprocess.TimeoutExpired:
+		return {
+			'success': False,
+			'message': 'Git command timed out',
+			'output': '\n'.join(output_lines) + '\nError: Command timed out'
+		}
+	except Exception as e:
+		return {
+			'success': False,
+			'message': f'Exception: {str(e)}',
+			'output': '\n'.join(output_lines) + f'\nError: {str(e)}'
+		}
+
+def UpdateMetadata(new_version):
+	"""
+	Update the version and last_updated timestamp in irrigator.json
+	:param new_version: version string (YYYY.MM.BBB format)
+	"""
+	try:
+		json_data = ReadJSON(json_data_filename="irrigator.json", type="settings")
+		if 'metadata' not in json_data:
+			json_data['metadata'] = {}
+		json_data['metadata']['version'] = new_version
+		json_data['metadata']['last_updated'] = datetime.datetime.now().isoformat()
+		WriteJSON(json_data)
+		WriteLog(f"Updated metadata to version {new_version}")
+		return True
+	except Exception as e:
+		WriteLog(f"Exception updating metadata: {str(e)}")
+		return False
+
+def RunUpgradePath(old_version, new_version):
+	"""
+	Execute upgrade/migration logic based on version comparison
+	Runs all upgrade steps between old_version and new_version in sequence
+	
+	:param old_version: current version (YYYY.MM.BBB format)
+	:param new_version: target version (YYYY.MM.BBB format)
+	:return: dict with {success: bool, message: str, details: []}
+	"""
+	result = {
+		'success': True,
+		'message': f'Upgraded from {old_version} to {new_version}',
+		'details': []
+	}
+	
+	# Parse versions for comparison
+	def version_tuple(v):
+		try:
+			parts = v.split('.')
+			return tuple(int(p) for p in parts)
+		except:
+			return (0, 0, 0)
+	
+	old_tuple = version_tuple(old_version)
+	new_tuple = version_tuple(new_version)
+	
+	if old_tuple >= new_tuple:
+		result['details'].append('Already at or ahead of target version')
+		return result
+	
+	# List of upgrade steps by version
+	# Format: (version_tuple, function, description)
+	upgrade_steps = [
+		# Example for future use:
+		# ((2026, 5, 2), upgrade_2026_05_002, "Crontab sync"),
+		# ((2026, 6, 0), upgrade_2026_06_000, "New feature setup"),
+	]
+	
+	# Execute each upgrade step that falls between old_version and new_version
+	for step_version, upgrade_func, description in upgrade_steps:
+		if old_tuple < step_version <= new_tuple:
+			try:
+				result['details'].append(f"Running: {description}...")
+				upgrade_func()
+				result['details'].append(f"✓ {description} complete")
+				WriteLog(f"Upgrade step {step_version}: {description} completed")
+			except Exception as e:
+				error_msg = f"✗ {description} failed: {str(e)}"
+				result['details'].append(error_msg)
+				WriteLog(f"Upgrade step {step_version}: {description} FAILED - {str(e)}")
+				result['success'] = False
+	
+	if not result['details']:
+		result['details'].append('No version-specific upgrade steps needed')
+	
+	return result

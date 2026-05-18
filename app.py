@@ -13,6 +13,9 @@ import time
 import datetime
 import os
 import json
+import subprocess
+import threading
+from queue import Queue
 from cron_descriptor import get_description, ExpressionDescriptor
 from crontab import CronTab
 from common import *
@@ -23,6 +26,11 @@ pathtoirrigator = "/usr/local/bin/irrigator"
 app = Flask(__name__)
 app_startup_logged = False
 
+# Update system state
+update_queue = Queue()
+update_thread = None
+update_in_progress = False
+
 def log_app_startup():
 	global app_startup_logged
 	if(app_startup_logged == False):
@@ -30,6 +38,27 @@ def log_app_startup():
 		app_startup_logged = True
 
 log_app_startup()
+
+# Check for updates and run upgrade path at startup
+def check_and_run_upgrades():
+	"""Check if local version is behind manifest and run upgrade path"""
+	try:
+		local_version = get_local_version()
+		manifest_data = ReadVersionManifest()
+		manifest_version = manifest_data.get('global_version', DEFAULT_VERSION)
+		
+		if local_version != manifest_version:
+			WriteLog(f"Version mismatch detected: local={local_version}, manifest={manifest_version}")
+			upgrade_result = RunUpgradePath(local_version, manifest_version)
+			if upgrade_result['success']:
+				WriteLog(f"Upgrade completed successfully from {local_version} to {manifest_version}")
+				UpdateMetadata(manifest_version)
+			else:
+				WriteLog(f"Upgrade attempt from {local_version} to {manifest_version} had errors: {upgrade_result['message']}")
+	except Exception as e:
+		WriteLog(f"Exception during startup upgrade check: {str(e)}")
+
+check_and_run_upgrades()
 
 @app.route('/<action>', methods=['POST','GET'])
 @app.route('/', methods=['POST','GET'])
@@ -982,6 +1011,183 @@ def CheckConflicts(json_data_dict):
 							conflict_msg = conflict_msg + " ! Conflict detected between " + compare_name + " and " + schedule_name + "; Time conflict where schedule runs overnight. Please review and fix schedule.   \n"
 
 	return(conflict_found, conflict_msg)
+
+# ************************************************************
+# Update System API Endpoints
+# ************************************************************
+
+def send_update_message(status, message):
+	"""Helper to send message to update queue"""
+	try:
+		update_queue.put({'status': status, 'message': message})
+	except:
+		pass
+
+def perform_update_background():
+	"""Background thread function to perform update and migration"""
+	global update_in_progress
+	try:
+		send_update_message('running', 'Checking git repository...')
+		
+		if not is_git_repo():
+			send_update_message('error', 'Error: Not a git repository. Cannot check for updates.')
+			update_in_progress = False
+			return
+		
+		# Get current and manifest versions
+		local_version = get_local_version()
+		manifest_data = ReadVersionManifest()
+		manifest_version = manifest_data.get('global_version', DEFAULT_VERSION)
+		
+		send_update_message('running', f'Current version: {local_version}')
+		send_update_message('running', f'Available version: {manifest_version}')
+		
+		# Perform git update
+		send_update_message('running', 'Pulling updates from remote repository...')
+		git_result = perform_git_update()
+		
+		if not git_result['success']:
+			send_update_message('error', f'Git update failed: {git_result["message"]}')
+			send_update_message('error', git_result['output'])
+			update_in_progress = False
+			return
+		
+		send_update_message('running', git_result['output'])
+		
+		# Run upgrade path
+		send_update_message('running', 'Running upgrade migrations...')
+		upgrade_result = RunUpgradePath(local_version, manifest_version)
+		
+		if upgrade_result['details']:
+			for detail in upgrade_result['details']:
+				send_update_message('running', detail)
+		
+		# Update metadata with new version
+		send_update_message('running', f'Updating to version {manifest_version}...')
+		if UpdateMetadata(manifest_version):
+			send_update_message('running', f'✓ Version updated to {manifest_version}')
+		else:
+			send_update_message('error', 'Failed to update version metadata')
+		
+		# Restart Flask app
+		send_update_message('running', 'Restarting Flask application...')
+		try:
+			# Try to restart via supervisorctl first
+			result = subprocess.run(['supervisorctl', 'restart', 'webapp'],
+									capture_output=True, timeout=10)
+			if result.returncode == 0:
+				send_update_message('success', 'Update complete! Application restarting...')
+			else:
+				# Fallback: kill gunicorn and let supervisord restart it
+				send_update_message('running', 'supervisorctl not available, killing gunicorn...')
+				subprocess.run(['pkill', '-f', 'gunicorn'], timeout=5)
+				send_update_message('success', 'Update complete! Application restarting...')
+		except subprocess.TimeoutExpired:
+			send_update_message('warning', 'Restart command timed out, but update succeeded')
+			send_update_message('success', 'Update complete! Please refresh the page.')
+		except Exception as e:
+			send_update_message('warning', f'Restart failed: {str(e)}, but update succeeded')
+			send_update_message('success', 'Update complete! Please refresh the page.')
+		
+		update_in_progress = False
+	except Exception as e:
+		send_update_message('error', f'Unexpected error: {str(e)}')
+		update_in_progress = False
+
+@app.route('/api/updates/check', methods=['GET'])
+def api_updates_check():
+	"""Check for available updates"""
+	try:
+		if not is_git_repo():
+			return {
+				'error': 'Not a git repository',
+				'commits_behind': 0,
+				'commits': []
+			}, 400
+		
+		# Get commit info
+		commit_count = get_remote_commit_count()
+		if isinstance(commit_count, dict) and 'error' in commit_count:
+			return {
+				'error': commit_count['error'],
+				'commits_behind': 0,
+				'commits': []
+			}, 400
+		
+		commits = get_commits_since_local()
+		if isinstance(commits, dict) and 'error' in commits:
+			commits = []
+		
+		# Get version info
+		local_version = get_local_version()
+		manifest_data = ReadVersionManifest()
+		manifest_version = manifest_data.get('global_version', DEFAULT_VERSION)
+		
+		return {
+			'local_version': local_version,
+			'remote_version': manifest_version,
+			'commits_behind': commit_count if isinstance(commit_count, int) else 0,
+			'commits': commits if isinstance(commits, list) else []
+		}, 200
+	except Exception as e:
+		return {
+			'error': f'Exception: {str(e)}',
+			'commits_behind': 0,
+			'commits': []
+		}, 500
+
+@app.route('/api/updates/perform', methods=['POST'])
+def api_updates_perform():
+	"""Start the update process"""
+	global update_in_progress, update_thread
+	
+	if update_in_progress:
+		return {'error': 'Update already in progress'}, 409
+	
+	# Clear the queue
+	while not update_queue.empty():
+		try:
+			update_queue.get_nowait()
+		except:
+			break
+	
+	update_in_progress = True
+	update_thread = threading.Thread(target=perform_update_background, daemon=True)
+	update_thread.start()
+	
+	return {'status': 'Update started', 'message': 'Check /api/updates/stream for progress'}, 202
+
+@app.route('/api/updates/stream', methods=['GET'])
+def api_updates_stream():
+	"""Server-Sent Events stream for update progress"""
+	def generate():
+		# Send initial message
+		yield 'data: {"status": "running", "message": "Update stream connected..."}\n\n'
+		
+		# Stream messages from queue
+		max_iterations = 300  # Timeout after 5 minutes (300 * 1s)
+		iterations = 0
+		
+		while iterations < max_iterations:
+			try:
+				message = update_queue.get(timeout=1)
+				yield f'data: {json.dumps(message)}\n\n'
+				
+				# If this is a final message, wait a bit then close
+				if message['status'] in ['success', 'error']:
+					# Yield one more final message before closing
+					iterations = max_iterations
+			except:
+				# Queue timeout, just continue
+				iterations += 1
+		
+		yield 'data: {"status": "closed", "message": "Stream closed"}\n\n'
+	
+	return generate(), 200, {
+		'Content-Type': 'text/event-stream',
+		'Cache-Control': 'no-cache',
+		'X-Accel-Buffering': 'no'
+	}
 
 if __name__ == '__main__':
 	if is_raspberry_pi():

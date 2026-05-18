@@ -99,6 +99,70 @@
       </div>
     </div>
 
+    <div class="panel panel-primary">
+      <div class="panel-heading">
+        <h3 class="panel-title">Updates</h3>
+      </div>
+      <div class="panel-body">
+        <div id="updates_status" style="margin-bottom: 15px;">
+          <p><strong>Status:</strong> <span id="update_status_text">Checking...</span></p>
+          <p id="version_info" style="display: none;"><strong>Version:</strong> Local: <span id="local_version">-</span> | Remote: <span id="remote_version">-</span></p>
+          <p id="commits_info" style="display: none;"><span id="commits_behind_text">-</span></p>
+        </div>
+        <button type="button" class="btn btn-lg btn-primary" id="check_updates_btn">Check for Updates</button>
+        <button type="button" class="btn btn-lg btn-success" id="view_updates_btn" style="display: none;" data-toggle="modal" data-target="#updates_detail_modal">View Updates</button>
+        <span id="update_available_badge" class="label label-warning" style="display: none; font-size: 1.2em; margin-left: 10px;">Update Available</span>
+        <span id="up_to_date_msg" style="display: none; color: green; font-size: 1.1em; margin-left: 10px;">✓ You're up to date</span>
+      </div>
+    </div>
+
+    <!-- Updates Detail Modal -->
+    <div id="updates_detail_modal" class="modal fade" role="dialog">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal">&times;</button>
+            <h4 class="modal-title"><span class="glyphicon glyphicon-cloud-download"></span> Available Updates</h4>
+          </div>
+          <div class="modal-body">
+            <div id="commits_list" style="max-height: 400px; overflow-y: auto;">
+              <p>Loading commits...</p>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-success" id="install_update_btn">Install Update</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Update Progress Modal -->
+    <div id="update_progress_modal" class="modal fade" role="dialog" data-backdrop="static" data-keyboard="false">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h4 class="modal-title"><span class="glyphicon glyphicon-cog"></span> Update Progress</h4>
+          </div>
+          <div class="modal-body">
+            <div class="progress" style="height: 20px; margin-bottom: 15px;">
+              <div id="progress_bar" class="progress-bar progress-bar-striped active" role="progressbar" style="width: 100%">
+                <span id="progress_text">Running...</span>
+              </div>
+            </div>
+            <div id="update_log" style="background: #f5f5f5; border: 1px solid #ddd; padding: 10px; height: 250px; overflow-y: auto; font-family: monospace; font-size: 0.9em; margin-bottom: 15px;">
+              <p>Initializing update...</p>
+            </div>
+            <div id="update_status_final" style="display: none; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
+              <p id="update_final_message"></p>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-default" id="close_progress_btn" style="display: none;" data-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <div class="panel panel-primary">
       <div class="panel-heading">
@@ -253,6 +317,233 @@
     </div>
 
   </div> <!-- End of Body Container -->
+
+  <script>
+    // ========================================
+    // Update System JavaScript
+    // ========================================
+
+    let current_commits = [];
+    let update_in_progress = false;
+
+    // Check for updates on page load
+    $(document).ready(function() {
+      check_for_updates();
+    });
+
+    function check_for_updates() {
+      $('#update_status_text').text('Checking for updates...');
+      $('#check_updates_btn').prop('disabled', true);
+
+      $.ajax({
+        url: '/api/updates/check',
+        method: 'GET',
+        dataType: 'json',
+        success: function(data) {
+          $('#version_info').show();
+          $('#local_version').text(data.local_version || 'Unknown');
+          $('#remote_version').text(data.remote_version || 'Unknown');
+
+          if (data.commits_behind > 0) {
+            $('#commits_info').show();
+            $('#commits_behind_text').text(data.commits_behind + ' commit(s) behind main');
+            $('#update_status_text').text('Updates available!');
+            $('#update_available_badge').show();
+            $('#up_to_date_msg').hide();
+            $('#view_updates_btn').show();
+            current_commits = data.commits || [];
+          } else {
+            $('#commits_info').hide();
+            $('#update_status_text').text('Up to date');
+            $('#update_available_badge').hide();
+            $('#up_to_date_msg').show();
+            $('#view_updates_btn').hide();
+            current_commits = [];
+          }
+        },
+        error: function(xhr, status, error) {
+          $('#update_status_text').text('Error checking for updates: ' + error);
+          $('#update_available_badge').hide();
+          $('#up_to_date_msg').hide();
+          $('#view_updates_btn').hide();
+        },
+        complete: function() {
+          $('#check_updates_btn').prop('disabled', false);
+        }
+      });
+    }
+
+    // Check for Updates button
+    $('#check_updates_btn').click(function() {
+      check_for_updates();
+    });
+
+    // View Updates modal - populate commits list
+    $('#updates_detail_modal').on('show.bs.modal', function() {
+      populate_commits_list();
+    });
+
+    function populate_commits_list() {
+      let html = '';
+      if (current_commits.length === 0) {
+        html = '<p>No commits to display.</p>';
+      } else {
+        html = '<div class="panel-group" id="commits_accordion">';
+        current_commits.forEach(function(commit, index) {
+          let commit_title = commit.title || 'No title';
+          let commit_body = commit.body || 'No description';
+          let commit_hash = (commit.hash || '').substring(0, 7);
+          let panel_id = 'commit_' + index;
+
+          html += `
+            <div class="panel panel-default">
+              <div class="panel-heading">
+                <h5 class="panel-title">
+                  <a data-toggle="collapse" href="#${panel_id}">
+                    <strong>${commit_title}</strong>
+                    <span style="color: #888; font-size: 0.9em; margin-left: 10px;">${commit_hash}</span>
+                    <span class="glyphicon glyphicon-chevron-down pull-right"></span>
+                  </a>
+                </h5>
+              </div>
+              <div id="${panel_id}" class="panel-collapse collapse">
+                <div class="panel-body">
+                  <pre style="background: #f5f5f5; padding: 10px; border-radius: 4px;">${escape_html(commit_body)}</pre>
+                </div>
+              </div>
+            </div>
+          `;
+        });
+        html += '</div>';
+      }
+      $('#commits_list').html(html);
+    }
+
+    function escape_html(text) {
+      let div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Install Update button
+    $('#install_update_btn').click(function() {
+      if (update_in_progress) {
+        alert('Update already in progress!');
+        return;
+      }
+
+      // Close the detail modal
+      $('#updates_detail_modal').modal('hide');
+
+      // Show progress modal
+      $('#update_progress_modal').modal('show');
+      $('#update_log').html('<p>Initializing update...</p>');
+      $('#update_status_final').hide();
+      $('#close_progress_btn').hide();
+
+      // Start the update
+      start_update();
+    });
+
+    function start_update() {
+      update_in_progress = true;
+
+      $.ajax({
+        url: '/api/updates/perform',
+        method: 'POST',
+        dataType: 'json',
+        success: function(data) {
+          // Start streaming progress
+          stream_update_progress();
+        },
+        error: function(xhr, status, error) {
+          $('#update_log').append('<p style="color: red;"><strong>Error starting update:</strong> ' + error + '</p>');
+          $('#update_status_final').show();
+          $('#update_status_final').css('background-color', '#f8d7da');
+          $('#update_final_message').text('Update failed to start: ' + error);
+          $('#close_progress_btn').show();
+          update_in_progress = false;
+        }
+      });
+    }
+
+    function stream_update_progress() {
+      let log_element = document.getElementById('update_log');
+      let event_source;
+
+      try {
+        event_source = new EventSource('/api/updates/stream');
+
+        event_source.onmessage = function(event) {
+          let message = JSON.parse(event.data);
+
+          // Append message to log
+          let message_html = '<p>';
+          if (message.status === 'running') {
+            message_html += message.message;
+          } else if (message.status === 'success') {
+            message_html += '<strong style="color: green;">✓ ' + message.message + '</strong>';
+          } else if (message.status === 'error') {
+            message_html += '<strong style="color: red;">✗ ' + message.message + '</strong>';
+          } else if (message.status === 'warning') {
+            message_html += '<strong style="color: orange;">⚠ ' + message.message + '</strong>';
+          }
+          message_html += '</p>';
+
+          log_element.innerHTML += message_html;
+          log_element.scrollTop = log_element.scrollHeight;
+
+          // Handle final states
+          if (message.status === 'success') {
+            $('#progress_bar').removeClass('progress-bar-striped active');
+            $('#progress_text').text('Complete');
+            $('#update_status_final').show();
+            $('#update_status_final').css('background-color', '#d4edda');
+            $('#update_final_message').html('<strong>Update completed successfully!</strong><br>The application is restarting...<br><br><em>Redirecting in 5 seconds...</em>');
+            $('#close_progress_btn').show();
+            event_source.close();
+            update_in_progress = false;
+
+            // Redirect after 5 seconds
+            setTimeout(function() {
+              window.location.href = '/admin';
+            }, 5000);
+          } else if (message.status === 'error') {
+            $('#progress_bar').removeClass('progress-bar-striped active');
+            $('#progress_text').text('Error');
+            $('#update_status_final').show();
+            $('#update_status_final').css('background-color', '#f8d7da');
+            $('#update_final_message').html('<strong>Update failed!</strong><br>Check the log above for details.');
+            $('#close_progress_btn').show();
+            event_source.close();
+            update_in_progress = false;
+          }
+        };
+
+        event_source.onerror = function() {
+          event_source.close();
+          if (!update_in_progress) {
+            // Update likely completed and app restarted
+            $('#update_log').append('<p style="color: blue;"><em>Update stream disconnected (app restarting)</em></p>');
+          } else {
+            $('#update_log').append('<p style="color: red;"><strong>Error:</strong> Connection lost while streaming updates</p>');
+            $('#update_status_final').show();
+            $('#update_status_final').css('background-color', '#f8d7da');
+            $('#update_final_message').text('Connection lost. The update may still be in progress. Please check the admin page after a moment.');
+            $('#close_progress_btn').show();
+            update_in_progress = false;
+          }
+        };
+      } catch (e) {
+        $('#update_log').append('<p style="color: red;"><strong>Error:</strong> ' + e.message + '</p>');
+        $('#update_status_final').show();
+        $('#update_status_final').css('background-color', '#f8d7da');
+        $('#update_final_message').text('Error setting up update stream: ' + e.message);
+        $('#close_progress_btn').show();
+        update_in_progress = false;
+      }
+    }
+  </script>
 
 </body>
 </html>
