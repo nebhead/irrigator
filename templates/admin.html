@@ -340,13 +340,15 @@
         method: 'GET',
         dataType: 'json',
         success: function(data) {
+          let tracking_ref = data.tracking_ref || 'upstream';
+
           $('#version_info').show();
           $('#local_version').text(data.local_version || 'Unknown');
           $('#remote_version').text(data.remote_version || 'Unknown');
 
           if (data.commits_behind > 0) {
             $('#commits_info').show();
-            $('#commits_behind_text').text(data.commits_behind + ' commit(s) behind main');
+            $('#commits_behind_text').text(data.commits_behind + ' commit(s) behind ' + tracking_ref);
             $('#update_status_text').text('Updates available!');
             $('#update_available_badge').show();
             $('#up_to_date_msg').hide();

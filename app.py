@@ -1101,15 +1101,19 @@ def api_updates_check():
 		if not is_git_repo():
 			return {
 				'error': 'Not a git repository',
+				'tracking_ref': None,
 				'commits_behind': 0,
 				'commits': []
 			}, 400
+
+		tracking_ref = get_tracking_ref()
 		
 		# Get commit info
 		commit_count = get_remote_commit_count()
 		if isinstance(commit_count, dict) and 'error' in commit_count:
 			return {
 				'error': commit_count['error'],
+				'tracking_ref': tracking_ref,
 				'commits_behind': 0,
 				'commits': []
 			}, 400
@@ -1126,12 +1130,14 @@ def api_updates_check():
 		return {
 			'local_version': local_version,
 			'remote_version': manifest_version,
+			'tracking_ref': tracking_ref,
 			'commits_behind': commit_count if isinstance(commit_count, int) else 0,
 			'commits': commits if isinstance(commits, list) else []
 		}, 200
 	except Exception as e:
 		return {
 			'error': f'Exception: {str(e)}',
+			'tracking_ref': None,
 			'commits_behind': 0,
 			'commits': []
 		}, 500

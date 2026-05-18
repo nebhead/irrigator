@@ -343,8 +343,68 @@ def is_git_repo():
 	Check if the current directory is a git repository
 	:return: True if .git directory exists, False otherwise
 	"""
-	import os
-	return os.path.isdir('.git')
+	import subprocess
+	try:
+		result = subprocess.run(
+			['git', 'rev-parse', '--is-inside-work-tree'],
+			capture_output=True, text=True, timeout=5
+		)
+		return result.returncode == 0 and result.stdout.strip() == 'true'
+	except Exception:
+		return False
+
+def get_tracking_ref():
+	"""
+	Resolve the upstream tracking ref for HEAD (for example: origin/main).
+	Falls back to origin/HEAD and then origin/main.
+	:return: remote tracking ref string
+	"""
+	import subprocess
+	try:
+		result = subprocess.run(
+			['git', 'rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'],
+			capture_output=True, text=True, timeout=5
+		)
+		if result.returncode == 0 and result.stdout.strip():
+			return result.stdout.strip()
+	except Exception:
+		pass
+
+	try:
+		result = subprocess.run(
+			['git', 'symbolic-ref', 'refs/remotes/origin/HEAD'],
+			capture_output=True, text=True, timeout=5
+		)
+		if result.returncode == 0 and result.stdout.strip():
+			return result.stdout.strip().replace('refs/remotes/', '')
+	except Exception:
+		pass
+
+	return 'origin/main'
+
+def fetch_tracking_ref(tracking_ref):
+	"""
+	Fetch updates for the remote/branch represented by tracking_ref.
+	:return: (success: bool, error_message: str)
+	"""
+	import subprocess
+	parts = tracking_ref.split('/', 1)
+	if len(parts) != 2:
+		return (False, f'Invalid tracking ref: {tracking_ref}')
+
+	remote_name, branch_name = parts
+	try:
+		result = subprocess.run(
+			['git', 'fetch', remote_name, branch_name],
+			capture_output=True, text=True, timeout=30
+		)
+		if result.returncode != 0:
+			return (False, result.stderr.strip() or 'fetch failed')
+		return (True, '')
+	except subprocess.TimeoutExpired:
+		return (False, 'fetch timed out')
+	except Exception as e:
+		return (False, str(e))
 
 def get_local_version():
 	"""
@@ -364,7 +424,7 @@ def get_local_version():
 
 def get_remote_commit_count():
 	"""
-	Get the number of commits behind origin/main
+	Get the number of commits behind tracked upstream
 	:return: int count of commits behind, or error string if not a git repo
 	"""
 	if not is_git_repo():
@@ -372,18 +432,20 @@ def get_remote_commit_count():
 	
 	try:
 		import subprocess
-		# Fetch to get latest remote info
-		subprocess.run(['git', 'fetch', 'origin', 'main', '--dry-run'], 
-					   capture_output=True, timeout=15)
-		
-		# Count commits: how many commits are on origin/main but not on HEAD
-		result = subprocess.run(['git', 'rev-list', 'origin/main', '^HEAD'],
-							   capture_output=True, text=True, timeout=10)
+		tracking_ref = get_tracking_ref()
+		fetch_ok, fetch_error = fetch_tracking_ref(tracking_ref)
+		if not fetch_ok:
+			return {'error': 'Failed to fetch updates: ' + fetch_error}
+
+		# Count commits on tracked upstream that are not on local HEAD
+		result = subprocess.run(
+			['git', 'rev-list', '--count', f'HEAD..{tracking_ref}'],
+			capture_output=True, text=True, timeout=10
+		)
 		
 		if result.returncode == 0:
-			lines = result.stdout.strip().split('\n')
-			count = len([l for l in lines if l.strip()])
-			return count
+			count_text = result.stdout.strip()
+			return int(count_text) if count_text else 0
 		else:
 			return {'error': 'Failed to count commits: ' + result.stderr}
 	except subprocess.TimeoutExpired:
@@ -393,7 +455,7 @@ def get_remote_commit_count():
 
 def get_commits_since_local():
 	"""
-	Get list of commits on origin/main that are not on local HEAD
+	Get list of commits on tracked upstream that are not on local HEAD
 	:return: list of dicts with {hash, title, body}, or error dict
 	"""
 	if not is_git_repo():
@@ -401,14 +463,15 @@ def get_commits_since_local():
 	
 	try:
 		import subprocess
-		# Fetch to get latest remote info (dry-run to avoid modifying state)
-		subprocess.run(['git', 'fetch', 'origin', 'main', '--dry-run'],
-					   capture_output=True, timeout=15)
+		tracking_ref = get_tracking_ref()
+		fetch_ok, fetch_error = fetch_tracking_ref(tracking_ref)
+		if not fetch_ok:
+			return {'error': 'Failed to fetch updates: ' + fetch_error}
 		
-		# Get commits: origin/main but not HEAD, with custom format
+		# Get commits: tracked upstream but not HEAD, with custom format
 		# Format: hash|title|body (separated by |, newline between commits)
 		result = subprocess.run(
-			['git', 'log', 'origin/main', '^HEAD', '--pretty=format:%H|%s|%b===COMMIT_END==='],
+			['git', 'log', f'HEAD..{tracking_ref}', '--pretty=format:%H|%s|%b===COMMIT_END==='],
 			capture_output=True, text=True, timeout=10
 		)
 		
@@ -437,7 +500,7 @@ def get_commits_since_local():
 
 def perform_git_update():
 	"""
-	Perform git update: fetch origin/main and merge with local changes
+	Perform git update against tracked upstream with local conflict preference to remote
 	Uses 'git merge -X theirs' to force remote changes over local in case of conflicts
 	:return: dict with {success: bool, message: str, output: str}
 	"""
@@ -451,10 +514,19 @@ def perform_git_update():
 	try:
 		import subprocess
 		output_lines = []
+		tracking_ref = get_tracking_ref()
+		parts = tracking_ref.split('/', 1)
+		if len(parts) != 2:
+			return {
+				'success': False,
+				'message': 'Invalid tracking ref',
+				'output': f'Error: Invalid tracking ref {tracking_ref}'
+			}
+		remote_name, branch_name = parts
 		
 		# Step 1: Fetch from remote
-		output_lines.append('[1/3] Fetching from origin/main...')
-		result = subprocess.run(['git', 'fetch', 'origin', 'main'],
+		output_lines.append(f'[1/3] Fetching from {tracking_ref}...')
+		result = subprocess.run(['git', 'fetch', remote_name, branch_name],
 							   capture_output=True, text=True, timeout=30)
 		if result.returncode != 0:
 			return {
@@ -465,8 +537,8 @@ def perform_git_update():
 		output_lines.append('✓ Fetch successful')
 		
 		# Step 2: Merge with -X theirs strategy (remote wins on conflicts)
-		output_lines.append('[2/3] Merging origin/main...')
-		result = subprocess.run(['git', 'merge', '-X', 'theirs', 'origin/main'],
+		output_lines.append(f'[2/3] Merging {tracking_ref}...')
+		result = subprocess.run(['git', 'merge', '-X', 'theirs', tracking_ref],
 							   capture_output=True, text=True, timeout=30)
 		if result.returncode != 0:
 			return {
