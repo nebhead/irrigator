@@ -1023,6 +1023,47 @@ def send_update_message(status, message):
 	except:
 		pass
 
+def attempt_restart_webapp():
+	"""Attempt to restart the Flask/gunicorn application via multiple methods"""
+	# Since app runs as root, no sudo needed. Try supervisor/systemd restart methods.
+	restart_methods = [
+		('supervisorctl', ['supervisorctl', 'restart', 'webapp']),
+		('systemctl', ['systemctl', 'restart', 'supervisor']),
+		('service', ['service', 'supervisor', 'restart']),
+	]
+	
+	for method_name, command in restart_methods:
+		try:
+			send_update_message('running', f'Attempting restart via {method_name}...')
+			result = subprocess.run(command, capture_output=True, text=True, timeout=15)
+			
+			if result.returncode == 0:
+				send_update_message('running', f'✓ {method_name} restart initiated')
+				return True
+			else:
+				error_msg = result.stderr.strip() or result.stdout.strip()
+				send_update_message('running', f'✗ {method_name} failed: {error_msg}')
+				continue
+		except subprocess.TimeoutExpired:
+			send_update_message('running', f'✗ {method_name} timed out')
+			continue
+		except FileNotFoundError:
+			send_update_message('running', f'✗ {method_name} not available')
+			continue
+		except Exception as e:
+			send_update_message('running', f'✗ {method_name} error: {str(e)}')
+			continue
+	
+	# Final fallback: kill gunicorn processes and hope supervisord restarts them
+	try:
+		send_update_message('running', 'Using fallback: killing gunicorn process...')
+		result = subprocess.run(['pkill', '-9', '-f', 'gunicorn'], capture_output=True, timeout=5)
+		send_update_message('running', '✓ Gunicorn killed, supervisord should restart it')
+		return True
+	except Exception as e:
+		send_update_message('error', f'All restart methods failed: {str(e)}')
+		return False
+
 def perform_update_background():
 	"""Background thread function to perform update and migration"""
 	global update_in_progress
@@ -1071,25 +1112,13 @@ def perform_update_background():
 		
 		# Restart Flask app
 		send_update_message('running', 'Restarting Flask application...')
-		try:
-			# Try to restart via supervisorctl first
-			result = subprocess.run(['supervisorctl', 'restart', 'webapp'],
-									capture_output=True, timeout=10)
-			if result.returncode == 0:
-				send_update_message('success', 'Update complete! Application restarting...')
-			else:
-				# Fallback: kill gunicorn and let supervisord restart it
-				send_update_message('running', 'supervisorctl not available, killing gunicorn...')
-				subprocess.run(['pkill', '-f', 'gunicorn'], timeout=5)
-				send_update_message('success', 'Update complete! Application restarting...')
-		except subprocess.TimeoutExpired:
-			send_update_message('warning', 'Restart command timed out, but update succeeded')
-			send_update_message('success', 'Update complete! Please refresh the page.')
-		except Exception as e:
-			send_update_message('warning', f'Restart failed: {str(e)}, but update succeeded')
-			send_update_message('success', 'Update complete! Please refresh the page.')
-		
-		update_in_progress = False
+		if attempt_restart_webapp():
+			send_update_message('success', 'Update complete! Application restarting...')
+			# Log the successful update
+			WriteLog(f'Update completed successfully: {local_version} -> {manifest_version}')
+		else:
+			send_update_message('error', 'Could not restart application. Manual restart may be required.')
+			WriteLog(f'Update completed but restart failed: {local_version} -> {manifest_version}')
 	except Exception as e:
 		send_update_message('error', f'Unexpected error: {str(e)}')
 		update_in_progress = False
