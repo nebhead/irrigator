@@ -172,63 +172,74 @@
 
                 <!-- Select Daily Frequency -->
                 <b><span class="glyphicon glyphicon-retweet"></span> Frequency:</b>
+                {% set schedule_day_of_month = index_value['start_time']['day_of_month'] %}
+                {% set schedule_day_of_week = index_value['start_time']['day_of_week'] %}
+                {% if schedule_day_of_week != '*' %}
+                  {% set schedule_frequency = 'custom' %}
+                {% elif schedule_day_of_month == '2-30/2' %}
+                  {% set schedule_frequency = 'even' %}
+                {% elif schedule_day_of_month == '1-31/2' %}
+                  {% set schedule_frequency = 'odd' %}
+                {% else %}
+                  {% set schedule_frequency = 'daily' %}
+                {% endif %}
                 <div class="btn-group" data-toggle="buttons">
 
-                  <label class="btn btn-default active" data-toggle="tab" data-target="#Daily-{{ index_key }}" data-parent="frequency_{{ index_key }}" aria-expanded="false" aria-controls="collapseExample">
-                    <input type="radio" name="frequency" value="daily" autocomplete="off" checked> Daily
+                  <label class="btn btn-default {% if schedule_frequency == 'daily' %}active{% endif %}" data-toggle="tab" data-target="#Daily-{{ index_key }}" data-parent="frequency_{{ index_key }}" aria-expanded="false" aria-controls="collapseExample">
+                    <input type="radio" name="frequency" value="daily" autocomplete="off" {% if schedule_frequency == 'daily' %}checked{% endif %}> Daily
                   </label>
 
-                  <label class="btn btn-default" data-toggle="tab" data-target="#Even-{{ index_key }}" data-parent="frequency_{{ index_key }}" aria-expanded="false" aria-controls="collapseExample">
-                    <input type="radio" name="frequency" value="even" autocomplete="off"> Even Days
+                  <label class="btn btn-default {% if schedule_frequency == 'even' %}active{% endif %}" data-toggle="tab" data-target="#Even-{{ index_key }}" data-parent="frequency_{{ index_key }}" aria-expanded="false" aria-controls="collapseExample">
+                    <input type="radio" name="frequency" value="even" autocomplete="off" {% if schedule_frequency == 'even' %}checked{% endif %}> Even Days
                   </label>
 
-                  <label class="btn btn-default" data-toggle="tab" data-target="#Odd-{{ index_key }}" data-parent="frequency_{{ index_key }}" aria-expanded="false" aria-controls="collapseExample">
-                    <input type="radio" name="frequency" value="odd" autocomplete="off"> Odd Days
+                  <label class="btn btn-default {% if schedule_frequency == 'odd' %}active{% endif %}" data-toggle="tab" data-target="#Odd-{{ index_key }}" data-parent="frequency_{{ index_key }}" aria-expanded="false" aria-controls="collapseExample">
+                    <input type="radio" name="frequency" value="odd" autocomplete="off" {% if schedule_frequency == 'odd' %}checked{% endif %}> Odd Days
                   </label>
 
-                  <label class="btn btn-default" data-toggle="tab" data-target="#Custom-{{ index_key }}" data-parent="frequency_{{ index_key }}" aria-expanded="false" aria-controls="collapseExample">
-                    <input type="radio" name="frequency" value="custom" autocomplete="off"> Custom Days
+                  <label class="btn btn-default {% if schedule_frequency == 'custom' %}active{% endif %}" data-toggle="tab" data-target="#Custom-{{ index_key }}" data-parent="frequency_{{ index_key }}" aria-expanded="false" aria-controls="collapseExample">
+                    <input type="radio" name="frequency" value="custom" autocomplete="off" {% if schedule_frequency == 'custom' %}checked{% endif %}> Custom Days
                   </label>
 
                 </div> <!-- End of Frequency Button Group -->
 
 
                 <div class="tab-content">
-                    <div class="tab-pane fade in active" id="Daily-{{ index_key }}">
+                    <div class="tab-pane fade {% if schedule_frequency == 'daily' %}in active{% endif %}" id="Daily-{{ index_key }}">
                       <br><i>Run Schedule Daily</i>
                     </div>
 
-                    <div class="tab-pane fade" id="Even-{{ index_key }}">
+                    <div class="tab-pane fade {% if schedule_frequency == 'even' %}in active{% endif %}" id="Even-{{ index_key }}">
                       <br><i>Run Schedule on Even Days of the Month (i.e. 2, 4, 6... 28, 30)</i>
                     </div>
 
-                    <div class="tab-pane fade" id="Odd-{{ index_key }}">
+                    <div class="tab-pane fade {% if schedule_frequency == 'odd' %}in active{% endif %}" id="Odd-{{ index_key }}">
                       <br><i>Run Schedule on Odd Days of the Month (i.e. 1, 3, 5... 29, 31)</i>
                     </div>
 
-                    <div class="tab-pane fade" id="Custom-{{ index_key }}">
+                    <div class="tab-pane fade {% if schedule_frequency == 'custom' %}in active{% endif %}" id="Custom-{{ index_key }}">
                       <br><i>Run Schedule on Specific Days of the Week.<br><br>Select Days:</i>
                         <div class="btn-group" data-toggle="buttons">
-                          <label class="btn btn-default">
-                            <input type="checkbox" name="sunday" autocomplete="off"> SUN
+                          <label class="btn btn-default {% if 'Sun' in schedule_day_of_week %}active{% endif %}">
+                            <input type="checkbox" name="sunday" autocomplete="off" {% if 'Sun' in schedule_day_of_week %}checked{% endif %}> SUN
                           </label>
-                          <label class="btn btn-default">
-                            <input type="checkbox" name="monday" autocomplete="off"> MON
+                          <label class="btn btn-default {% if 'Mon' in schedule_day_of_week %}active{% endif %}">
+                            <input type="checkbox" name="monday" autocomplete="off" {% if 'Mon' in schedule_day_of_week %}checked{% endif %}> MON
                           </label>
-                          <label class="btn btn-default">
-                            <input type="checkbox" name="tuesday" autocomplete="off"> TUE
+                          <label class="btn btn-default {% if 'Tue' in schedule_day_of_week %}active{% endif %}">
+                            <input type="checkbox" name="tuesday" autocomplete="off" {% if 'Tue' in schedule_day_of_week %}checked{% endif %}> TUE
                           </label>
-                          <label class="btn btn-default">
-                            <input type="checkbox" name="wednesday" autocomplete="off"> WED
+                          <label class="btn btn-default {% if 'Wed' in schedule_day_of_week %}active{% endif %}">
+                            <input type="checkbox" name="wednesday" autocomplete="off" {% if 'Wed' in schedule_day_of_week %}checked{% endif %}> WED
                           </label>
-                          <label class="btn btn-default">
-                            <input type="checkbox" name="thursday" autocomplete="off"> THU
+                          <label class="btn btn-default {% if 'Thu' in schedule_day_of_week %}active{% endif %}">
+                            <input type="checkbox" name="thursday" autocomplete="off" {% if 'Thu' in schedule_day_of_week %}checked{% endif %}> THU
                           </label>
-                          <label class="btn btn-default">
-                            <input type="checkbox" name="friday" autocomplete="off"> FRI
+                          <label class="btn btn-default {% if 'Fri' in schedule_day_of_week %}active{% endif %}">
+                            <input type="checkbox" name="friday" autocomplete="off" {% if 'Fri' in schedule_day_of_week %}checked{% endif %}> FRI
                           </label>
-                          <label class="btn btn-default">
-                            <input type="checkbox" name="saturday" autocomplete="off"> SAT
+                          <label class="btn btn-default {% if 'Sat' in schedule_day_of_week %}active{% endif %}">
+                            <input type="checkbox" name="saturday" autocomplete="off" {% if 'Sat' in schedule_day_of_week %}checked{% endif %}> SAT
                           </label>
                         </div>
                     </div> <!-- End of Custom Days Tab -->
@@ -241,13 +252,13 @@
                     <div class="col-xs-4">
                       <span class="glyphicon glyphicon-time"></span>
                       <b>Start Hour: </b>
-                      <input type="number" min="0" max= "23" class="form-control" name="hour" id="starthour_{{ index_key}}_{{ index_key3 }}" placeholder="{{ jdict['schedules'][index_key]['start_time']['hour'] }}">
+                      <input type="number" min="0" max= "23" class="form-control" name="hour" id="starthour_{{ index_key}}_{{ index_key3 }}" value="{{ jdict['schedules'][index_key]['start_time']['hour'] }}">
                     </div>
 
                     <div class="col-xs-4">
                       <span class="glyphicon glyphicon-time"></span>
                       <b>Start Minute: </b>
-                      <input type="number" min="0" max= "60" class="form-control" name="minute" id="startmin_{{ index_key}}_{{ index_key3 }}" placeholder="{{ jdict['schedules'][index_key]['start_time']['minute'] }}">
+                      <input type="number" min="0" max= "59" class="form-control" name="minute" id="startmin_{{ index_key}}_{{ index_key3 }}" value="{{ jdict['schedules'][index_key]['start_time']['minute'] }}">
                     </div>
                   </div>
                   <br><br>
@@ -273,7 +284,7 @@
                                   <span class="input-group-addon">
                                     mins:
                                   </span>
-                                  <input type="number" min="0" max= "60" class="form-control" name="duration_{{ index_key3 }}" id="duration_{{ index_key }}_{{ index_key3 }}" placeholder="0">
+                                  <input type="number" min="0" max= "60" class="form-control" name="duration_{{ index_key3 }}" id="duration_{{ index_key }}_{{ index_key3 }}" value="{{ jdict['schedules'][index_key]['zones'][index_key3]['duration'] if index_key3 in jdict['schedules'][index_key]['zones'] else 0 }}">
                                 </div>
                               </td>
                             {% endif %}
