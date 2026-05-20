@@ -712,6 +712,11 @@ def settings(action=None):
 		if(success==True):
 			print('Success:  Writing MQTT settings to file.')
 			WriteJSON(json_data_dict)
+			if mqtt_enabled:
+				deploy_result = DeployMQTTSupervisorConfig(trigger='settings_mqtt_save')
+				if not deploy_result['success']:
+					success = False
+					detail = 'MQTT settings saved but supervisor deployment failed: ' + str(deploy_result['message'])
 
 	return render_template('settings.html', jdict=json_data_dict, action=action, success=success, detail=detail)
 
@@ -1315,6 +1320,12 @@ def perform_update_background():
 		if upgrade_result['details']:
 			for detail in upgrade_result['details']:
 				send_update_message('running', detail)
+
+		if not upgrade_result['success']:
+			send_update_message('error', 'One or more upgrade migrations failed. Metadata will not be advanced; fix and retry update.')
+			WriteLog(f'Update aborted due to migration failure: {local_version} -> {manifest_version}')
+			update_in_progress = False
+			return
 		
 		# Update metadata with new version
 		send_update_message('running', f'Updating to version {manifest_version}...')

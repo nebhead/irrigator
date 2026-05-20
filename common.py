@@ -627,6 +627,79 @@ def UpdateMetadata(new_version):
 		WriteLog(f"Exception updating metadata: {str(e)}")
 		return False
 
+def DeployMQTTSupervisorConfig(trigger='unknown'):
+	"""
+	Deploy mqtt.conf into supervisord include directory and reload supervisor.
+	Returns dict: {success: bool, message: str, details: list[str]}
+	"""
+	result = {
+		'success': True,
+		'message': 'MQTT supervisor config deployed',
+		'details': []
+	}
+
+	def run_with_sudo_fallback(command, timeout=30):
+		cmd_result = subprocess.run(command, capture_output=True, text=True, timeout=timeout)
+		used_sudo = False
+		if cmd_result.returncode != 0:
+			sudo_result = subprocess.run(['sudo', '-n'] + command, capture_output=True, text=True, timeout=timeout)
+			if sudo_result.returncode == 0:
+				cmd_result = sudo_result
+				used_sudo = True
+		return cmd_result, used_sudo
+
+	try:
+		install_dir = os.path.dirname(os.path.abspath(__file__))
+		conf_src = os.path.join(install_dir, 'auto-install', 'supervisor', 'mqtt.conf')
+		conf_dst_dir = '/etc/supervisor/conf.d'
+		conf_dst = os.path.join(conf_dst_dir, 'mqtt.conf')
+
+		WriteLog(f"MQTT deploy [{trigger}]: source={conf_src} destination={conf_dst} euid={os.geteuid()}")
+
+		if not os.path.exists(conf_src):
+			raise Exception(f"Source config not found: {conf_src}")
+		if not os.path.isdir(conf_dst_dir):
+			raise Exception(f"Supervisor include directory not found: {conf_dst_dir}")
+
+		try:
+			shutil.copy2(conf_src, conf_dst)
+			result['details'].append('Copied mqtt.conf directly (no sudo)')
+		except PermissionError:
+			copy_result, used_sudo = run_with_sudo_fallback(['cp', conf_src, conf_dst])
+			if copy_result.returncode != 0:
+				raise Exception("Could not copy mqtt.conf: " + (copy_result.stderr.strip() or copy_result.stdout.strip() or 'unknown error'))
+			result['details'].append(f"Copied mqtt.conf using {'sudo' if used_sudo else 'direct'} command")
+
+		if not os.path.exists(conf_dst):
+			raise Exception(f"Destination file missing after copy: {conf_dst}")
+
+		reread_result, reread_sudo = run_with_sudo_fallback(['supervisorctl', 'reread'])
+		result['details'].append(f"supervisorctl reread rc={reread_result.returncode} sudo={reread_sudo}")
+		if reread_result.returncode != 0:
+			raise Exception("supervisorctl reread failed: " + (reread_result.stderr.strip() or reread_result.stdout.strip() or 'unknown error'))
+
+		update_result, update_sudo = run_with_sudo_fallback(['supervisorctl', 'update'])
+		result['details'].append(f"supervisorctl update rc={update_result.returncode} sudo={update_sudo}")
+		if update_result.returncode != 0:
+			raise Exception("supervisorctl update failed: " + (update_result.stderr.strip() or update_result.stdout.strip() or 'unknown error'))
+
+		status_result, status_sudo = run_with_sudo_fallback(['supervisorctl', 'status', 'mqtt'])
+		status_text = (status_result.stdout.strip() or status_result.stderr.strip() or '').strip()
+		result['details'].append(f"supervisorctl status mqtt rc={status_result.returncode} sudo={status_sudo} output={status_text}")
+
+		WriteLog("MQTT deploy: success")
+		for detail in result['details']:
+			WriteLog(f"MQTT deploy detail: {detail}")
+
+		return result
+	except Exception as e:
+		result['success'] = False
+		result['message'] = str(e)
+		WriteLog(f"MQTT deploy failed [{trigger}]: {str(e)}")
+		for detail in result['details']:
+			WriteLog(f"MQTT deploy detail: {detail}")
+		return result
+
 def upgrade_mqtt_2026_05_003():
 	"""
 	Install MQTT bridge for Home Assistant integration.
@@ -649,72 +722,12 @@ def upgrade_mqtt_2026_05_003():
 		
 		WriteLog("✓ MQTT dependencies installed")
 		
-		# Copy supervisord config
-		WriteLog("Upgrade: Deploying supervisord MQTT config...")
-		install_dir = os.path.dirname(os.path.abspath(__file__))
-		conf_src = os.path.join(install_dir, 'auto-install', 'supervisor', 'mqtt.conf')
-		conf_dst_dir = '/etc/supervisor/conf.d'
-		conf_dst = os.path.join(conf_dst_dir, 'mqtt.conf')
-		WriteLog(f"Upgrade: MQTT config source={conf_src} destination={conf_dst} euid={os.geteuid()}")
-
-		if not os.path.exists(conf_src):
-			raise Exception(f"Source config not found: {conf_src}")
-
-		if not os.path.isdir(conf_dst_dir):
-			raise Exception(f"Supervisor include directory not found: {conf_dst_dir}")
-
-		try:
-			shutil.copy2(conf_src, conf_dst)
-		except PermissionError:
-			copy_result = subprocess.run(
-				['sudo', '-n', 'cp', conf_src, conf_dst],
-				capture_output=True,
-				text=True,
-				timeout=30
-			)
-			if copy_result.returncode != 0:
-				raise Exception("Could not copy mqtt.conf with sudo: " + (copy_result.stderr.strip() or copy_result.stdout.strip() or 'unknown error'))
-
-		if not os.path.exists(conf_dst):
-			raise Exception(f"Failed to deploy supervisord config to {conf_dst}")
-		
-		WriteLog(f"✓ Supervisord config deployed to {conf_dst}")
-		
-		# Reload supervisord
-		WriteLog("Upgrade: Reloading supervisord...")
-		reread_result = subprocess.run(
-			['supervisorctl', 'reread'],
-			capture_output=True,
-			text=True,
-			timeout=30
-		)
-		if reread_result.returncode != 0:
-			reread_result = subprocess.run(
-				['sudo', '-n', 'supervisorctl', 'reread'],
-				capture_output=True,
-				text=True,
-				timeout=30
-			)
-		if reread_result.returncode != 0:
-			raise Exception("supervisorctl reread failed: " + (reread_result.stderr.strip() or reread_result.stdout.strip() or 'unknown error'))
-
-		update_result = subprocess.run(
-			['supervisorctl', 'update'],
-			capture_output=True,
-			text=True,
-			timeout=30
-		)
-		if update_result.returncode != 0:
-			update_result = subprocess.run(
-				['sudo', '-n', 'supervisorctl', 'update'],
-				capture_output=True,
-				text=True,
-				timeout=30
-			)
-		if update_result.returncode != 0:
-			raise Exception("supervisorctl update failed: " + (update_result.stderr.strip() or update_result.stdout.strip() or 'unknown error'))
-		
-		WriteLog("✓ Supervisord reloaded; MQTT process registered")
+		# Copy mqtt.conf and refresh supervisord
+		deploy_result = DeployMQTTSupervisorConfig(trigger='upgrade_mqtt_2026_05_003')
+		if deploy_result['success']:
+			WriteLog("✓ Supervisord reloaded; MQTT process registered")
+		else:
+			raise Exception(deploy_result['message'])
 		
 	except Exception as e:
 		WriteLog(f"MQTT upgrade failed: {str(e)}")
@@ -745,6 +758,7 @@ def RunUpgradePath(old_version, new_version):
 	
 	old_tuple = version_tuple(old_version)
 	new_tuple = version_tuple(new_version)
+	result['details'].append(f"Version compare old={old_tuple} new={new_tuple}")
 	
 	if old_tuple >= new_tuple:
 		result['details'].append('Already at or ahead of target version')
@@ -758,6 +772,7 @@ def RunUpgradePath(old_version, new_version):
 	
 	# Execute each upgrade step that falls between old_version and new_version
 	for step_version, upgrade_func, description in upgrade_steps:
+		result['details'].append(f"Evaluating step {step_version}: {description}")
 		if old_tuple < step_version <= new_tuple:
 			try:
 				result['details'].append(f"Running: {description}...")
@@ -769,6 +784,8 @@ def RunUpgradePath(old_version, new_version):
 				result['details'].append(error_msg)
 				WriteLog(f"Upgrade step {step_version}: {description} FAILED - {str(e)}")
 				result['success'] = False
+		else:
+			result['details'].append(f"Skipping: {description} (not in version window)")
 	
 	if not result['details']:
 		result['details'].append('No version-specific upgrade steps needed')
