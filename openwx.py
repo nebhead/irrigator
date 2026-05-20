@@ -209,7 +209,7 @@ def main():
     # *****************************************************
 	# Main Program
 	# *****************************************************
-	WriteStartupVersionLog('weather_api')
+	#WriteStartupVersionLog('weather_api')
 
 	#Read irrigator.json
 	irrigator = ReadJSON('irrigator.json')
