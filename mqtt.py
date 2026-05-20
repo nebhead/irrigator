@@ -4,17 +4,24 @@ MQTT Bridge for Home Assistant Integration
 Publishes IrriGator zone/schedule status and subscribes to commands from Home Assistant
 """
 
-import paho.mqtt.client as mqtt
 import json
 import time
 import os
 import sys
+import subprocess
 import threading
 from datetime import datetime
 
+try:
+	import paho.mqtt.client as mqtt
+	MQTT_IMPORT_ERROR = None
+except ImportError as exc:
+	mqtt = None
+	MQTT_IMPORT_ERROR = exc
+
 # Import common utilities
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from common import ReadJSON, WriteJSON, WriteLog, CheckString
+from common import ReadJSON, WriteJSON, WriteLog
 
 class MQTTBridge:
 	"""Bridge IrriGator state to MQTT for Home Assistant integration"""
@@ -24,6 +31,9 @@ class MQTTBridge:
 		Initialize MQTT bridge
 		:param settings: dict with mqtt configuration (server, port, username, password, topic_prefix, enabled)
 		"""
+		if mqtt is None:
+			raise RuntimeError("Missing dependency 'paho-mqtt'. Install it for the system interpreter with 'sudo /usr/bin/python3 -m pip install paho-mqtt'.") from MQTT_IMPORT_ERROR
+
 		self.settings = settings
 		self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1, client_id="irrigator")
 		self.client.on_connect = self.on_connect
@@ -141,11 +151,11 @@ class MQTTBridge:
 				
 				# Launch control.py to run the zone
 				WriteLog(f"MQTT: Triggering zone '{entity_name}' for {duration} minutes")
-				execute_string = f"python3 control.py -f -z {entity_name} -d {duration} &"
+				command = ['python3', 'control.py', '-f', '-z', entity_name, '-d', str(duration)]
 				if json_data['settings']['target_sys'] != 'None':
-					execute_string = f"sudo python3 control.py -f -z {entity_name} -d {duration} &"
-				
-				os.system(execute_string)
+					command.insert(0, 'sudo')
+
+				subprocess.Popen(command)
 			
 			elif entity_type == 'schedule':
 				if entity_name not in json_data.get('schedules', {}):
@@ -154,11 +164,11 @@ class MQTTBridge:
 				
 				# Launch control.py to run the schedule
 				WriteLog(f"MQTT: Triggering schedule '{entity_name}'")
-				execute_string = f"python3 control.py -f -s {entity_name} &"
+				command = ['python3', 'control.py', '-f', '-s', entity_name]
 				if json_data['settings']['target_sys'] != 'None':
-					execute_string = f"sudo python3 control.py -f -s {entity_name} &"
-				
-				os.system(execute_string)
+					command.insert(0, 'sudo')
+
+				subprocess.Popen(command)
 		
 		except Exception as e:
 			WriteLog(f"MQTT: Error handling {entity_type} command: {str(e)}")
@@ -256,6 +266,10 @@ class MQTTBridge:
 def main():
 	"""Entry point for MQTT bridge"""
 	try:
+		if mqtt is None:
+			WriteLog("MQTT: Missing dependency 'paho-mqtt'. Install it for the system interpreter with 'sudo /usr/bin/python3 -m pip install paho-mqtt'.")
+			sys.exit(1)
+
 		# Read configuration
 		json_data = ReadJSON()
 		mqtt_settings = json_data.get('mqtt', {})

@@ -712,15 +712,26 @@ def upgrade_mqtt_2026_05_003():
 
 		# Install paho-mqtt
 		result = subprocess.run(
-			['pip3', 'install', 'paho-mqtt'],
+			['/usr/bin/python3', '-m', 'pip', 'install', 'paho-mqtt'],
 			capture_output=True,
 			text=True,
 			timeout=120
 		)
+		used_sudo = False
 		if result.returncode != 0:
-			raise Exception("pip3 install paho-mqtt failed: " + (result.stderr.strip() or result.stdout.strip() or 'unknown error'))
+			sudo_result = subprocess.run(
+				['sudo', '-n', '/usr/bin/python3', '-m', 'pip', 'install', 'paho-mqtt'],
+				capture_output=True,
+				text=True,
+				timeout=120
+			)
+			if sudo_result.returncode == 0:
+				result = sudo_result
+				used_sudo = True
+		if result.returncode != 0:
+			raise Exception("python3 -m pip install paho-mqtt failed: " + (result.stderr.strip() or result.stdout.strip() or 'unknown error'))
 		
-		WriteLog("✓ MQTT dependencies installed")
+		WriteLog(f"✓ MQTT dependencies installed using {'sudo ' if used_sudo else ''}/usr/bin/python3 -m pip")
 		
 		# Copy mqtt.conf and refresh supervisord
 		deploy_result = DeployMQTTSupervisorConfig(trigger='upgrade_mqtt_2026_05_003')
