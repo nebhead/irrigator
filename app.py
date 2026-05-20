@@ -653,14 +653,12 @@ def settings(action=None):
 		success = True
 		detail = ""
 		response = request.form
+		mqtt_enabled = (response.get('mqtt_enabled') == 'on')
 
-		if ('mqtt_enabled' in response):
-			if (response['mqtt_enabled'] == 'on'):
-				json_data_dict['mqtt']['enabled'] = True
-			else:
-				json_data_dict['mqtt']['enabled'] = False
+		# Checkbox fields are omitted by browsers when unchecked; set explicit boolean every save.
+		json_data_dict['mqtt']['enabled'] = mqtt_enabled
 
-		if (response.get('mqtt_enabled') == 'on'):
+		if mqtt_enabled:
 			# Validate required fields if MQTT is enabled
 			if ('mqtt_server' in response) and response['mqtt_server']:
 				json_data_dict['mqtt']['server'] = str(response['mqtt_server'])

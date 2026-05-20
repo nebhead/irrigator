@@ -15,6 +15,8 @@ import io
 import re
 import os
 import tempfile
+import shutil
+import subprocess
 from cron_descriptor import get_description, ExpressionDescriptor
 
 VERSION_MANIFEST_FILENAME = "manifest.json"
@@ -634,30 +636,93 @@ def upgrade_mqtt_2026_05_003():
 	"""
 	try:
 		WriteLog("Upgrade: Installing MQTT dependencies...")
-		
+
 		# Install paho-mqtt
-		result = os.system("pip3 install paho-mqtt")
-		if result != 0:
-			raise Exception("pip3 install paho-mqtt failed")
+		result = subprocess.run(
+			['pip3', 'install', 'paho-mqtt'],
+			capture_output=True,
+			text=True,
+			timeout=120
+		)
+		if result.returncode != 0:
+			raise Exception("pip3 install paho-mqtt failed: " + (result.stderr.strip() or result.stdout.strip() or 'unknown error'))
 		
 		WriteLog("✓ MQTT dependencies installed")
 		
 		# Copy supervisord config
 		WriteLog("Upgrade: Deploying supervisord MQTT config...")
-		conf_src = "/usr/local/bin/irrigator/auto-install/supervisor/mqtt.conf"
-		conf_dst = "/etc/supervisor/conf.d/mqtt.conf"
-		
-		if os.path.exists(conf_src):
-			os.system(f"sudo cp {conf_src} {conf_dst}")
-		else:
+		install_dir = os.path.dirname(os.path.abspath(__file__))
+		conf_src = os.path.join(install_dir, 'auto-install', 'supervisor', 'mqtt.conf')
+
+		if not os.path.exists(conf_src):
 			raise Exception(f"Source config not found: {conf_src}")
+
+		candidate_dest_dirs = [
+			'/etc/supervisor/conf.d',
+			'/etc/supervisord.d',
+			'/etc/supervisor.d'
+		]
+
+		dest_dir = None
+		for candidate in candidate_dest_dirs:
+			if os.path.isdir(candidate):
+				dest_dir = candidate
+				break
+
+		if dest_dir is None:
+			raise Exception('Could not find a supervisord include directory (tried /etc/supervisor/conf.d, /etc/supervisord.d, /etc/supervisor.d)')
+
+		conf_dst = os.path.join(dest_dir, 'mqtt.conf')
+		try:
+			shutil.copy2(conf_src, conf_dst)
+		except PermissionError:
+			copy_result = subprocess.run(
+				['sudo', 'cp', conf_src, conf_dst],
+				capture_output=True,
+				text=True,
+				timeout=30
+			)
+			if copy_result.returncode != 0:
+				raise Exception("Could not copy mqtt.conf with sudo: " + (copy_result.stderr.strip() or copy_result.stdout.strip() or 'unknown error'))
+
+		if not os.path.exists(conf_dst):
+			raise Exception(f"Failed to deploy supervisord config to {conf_dst}")
 		
-		WriteLog("✓ Supervisord config deployed")
+		WriteLog(f"✓ Supervisord config deployed to {conf_dst}")
 		
 		# Reload supervisord
 		WriteLog("Upgrade: Reloading supervisord...")
-		os.system("sudo supervisorctl reread")
-		os.system("sudo supervisorctl update")
+		reread_result = subprocess.run(
+			['supervisorctl', 'reread'],
+			capture_output=True,
+			text=True,
+			timeout=30
+		)
+		if reread_result.returncode != 0:
+			reread_result = subprocess.run(
+				['sudo', 'supervisorctl', 'reread'],
+				capture_output=True,
+				text=True,
+				timeout=30
+			)
+		if reread_result.returncode != 0:
+			raise Exception("supervisorctl reread failed: " + (reread_result.stderr.strip() or reread_result.stdout.strip() or 'unknown error'))
+
+		update_result = subprocess.run(
+			['supervisorctl', 'update'],
+			capture_output=True,
+			text=True,
+			timeout=30
+		)
+		if update_result.returncode != 0:
+			update_result = subprocess.run(
+				['sudo', 'supervisorctl', 'update'],
+				capture_output=True,
+				text=True,
+				timeout=30
+			)
+		if update_result.returncode != 0:
+			raise Exception("supervisorctl update failed: " + (update_result.stderr.strip() or update_result.stdout.strip() or 'unknown error'))
 		
 		WriteLog("✓ Supervisord reloaded; MQTT process registered")
 		
