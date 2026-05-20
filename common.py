@@ -653,31 +653,21 @@ def upgrade_mqtt_2026_05_003():
 		WriteLog("Upgrade: Deploying supervisord MQTT config...")
 		install_dir = os.path.dirname(os.path.abspath(__file__))
 		conf_src = os.path.join(install_dir, 'auto-install', 'supervisor', 'mqtt.conf')
+		conf_dst_dir = '/etc/supervisor/conf.d'
+		conf_dst = os.path.join(conf_dst_dir, 'mqtt.conf')
+		WriteLog(f"Upgrade: MQTT config source={conf_src} destination={conf_dst} euid={os.geteuid()}")
 
 		if not os.path.exists(conf_src):
 			raise Exception(f"Source config not found: {conf_src}")
 
-		candidate_dest_dirs = [
-			'/etc/supervisor/conf.d',
-			'/etc/supervisord.d',
-			'/etc/supervisor.d'
-		]
+		if not os.path.isdir(conf_dst_dir):
+			raise Exception(f"Supervisor include directory not found: {conf_dst_dir}")
 
-		dest_dir = None
-		for candidate in candidate_dest_dirs:
-			if os.path.isdir(candidate):
-				dest_dir = candidate
-				break
-
-		if dest_dir is None:
-			raise Exception('Could not find a supervisord include directory (tried /etc/supervisor/conf.d, /etc/supervisord.d, /etc/supervisor.d)')
-
-		conf_dst = os.path.join(dest_dir, 'mqtt.conf')
 		try:
 			shutil.copy2(conf_src, conf_dst)
 		except PermissionError:
 			copy_result = subprocess.run(
-				['sudo', 'cp', conf_src, conf_dst],
+				['sudo', '-n', 'cp', conf_src, conf_dst],
 				capture_output=True,
 				text=True,
 				timeout=30
@@ -700,7 +690,7 @@ def upgrade_mqtt_2026_05_003():
 		)
 		if reread_result.returncode != 0:
 			reread_result = subprocess.run(
-				['sudo', 'supervisorctl', 'reread'],
+				['sudo', '-n', 'supervisorctl', 'reread'],
 				capture_output=True,
 				text=True,
 				timeout=30
@@ -716,7 +706,7 @@ def upgrade_mqtt_2026_05_003():
 		)
 		if update_result.returncode != 0:
 			update_result = subprocess.run(
-				['sudo', 'supervisorctl', 'update'],
+				['sudo', '-n', 'supervisorctl', 'update'],
 				capture_output=True,
 				text=True,
 				timeout=30

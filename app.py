@@ -653,22 +653,38 @@ def settings(action=None):
 		success = True
 		detail = ""
 		response = request.form
+
+		# Backfill missing MQTT structure for legacy irrigator.json files.
+		mqtt_defaults = {
+			'enabled': False,
+			'server': '',
+			'port': 1883,
+			'username': '',
+			'password': '',
+			'topic_prefix': 'irrigator',
+			'last_connected': None
+		}
+		if ('mqtt' not in json_data_dict) or (not isinstance(json_data_dict['mqtt'], dict)):
+			json_data_dict['mqtt'] = mqtt_defaults.copy()
+		else:
+			for mqtt_key, mqtt_value in mqtt_defaults.items():
+				if mqtt_key not in json_data_dict['mqtt']:
+					json_data_dict['mqtt'][mqtt_key] = mqtt_value
+
 		mqtt_enabled = (response.get('mqtt_enabled') == 'on')
 
 		# Checkbox fields are omitted by browsers when unchecked; set explicit boolean every save.
 		json_data_dict['mqtt']['enabled'] = mqtt_enabled
 
-		if mqtt_enabled:
-			# Validate required fields if MQTT is enabled
-			if ('mqtt_server' in response) and response['mqtt_server']:
-				json_data_dict['mqtt']['server'] = str(response['mqtt_server'])
-			else:
-				success = False
-				detail = "MQTT Server is required when enabled."
+		# Allow server/port edits regardless of enabled state.
+		if 'mqtt_server' in response:
+			json_data_dict['mqtt']['server'] = str(response['mqtt_server']).strip()
 
-			if ('mqtt_port' in response) and response['mqtt_port']:
+		if 'mqtt_port' in response:
+			port_raw = str(response['mqtt_port']).strip()
+			if port_raw != '':
 				try:
-					port_val = int(response['mqtt_port'])
+					port_val = int(port_raw)
 					if 1 <= port_val <= 65535:
 						json_data_dict['mqtt']['port'] = port_val
 					else:
@@ -677,6 +693,12 @@ def settings(action=None):
 				except:
 					success = False
 					detail = "MQTT Port must be a valid number."
+
+		if mqtt_enabled:
+			# Validate required fields only when MQTT is enabled.
+			if json_data_dict['mqtt']['server'] == '':
+				success = False
+				detail = "MQTT Server is required when enabled."
 
 		if ('mqtt_username' in response):
 			json_data_dict['mqtt']['username'] = str(response['mqtt_username'])
