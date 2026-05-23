@@ -325,6 +325,40 @@
 
     let current_commits = [];
     let update_in_progress = false;
+    const REDIRECT_DELAY_SECONDS = 30;
+    let redirect_countdown_interval = null;
+
+    function stop_redirect_countdown() {
+      if (redirect_countdown_interval !== null) {
+        clearInterval(redirect_countdown_interval);
+        redirect_countdown_interval = null;
+      }
+    }
+
+    function start_redirect_countdown() {
+      let seconds_remaining = REDIRECT_DELAY_SECONDS;
+
+      function render_countdown() {
+        $('#update_final_message').html(
+          '<strong>Update completed successfully!</strong><br>' +
+          'The application is restarting...<br><br>' +
+          '<em>Redirecting in ' + seconds_remaining + ' second(s)...</em>'
+        );
+      }
+
+      stop_redirect_countdown();
+      render_countdown();
+
+      redirect_countdown_interval = setInterval(function() {
+        seconds_remaining -= 1;
+        if (seconds_remaining <= 0) {
+          stop_redirect_countdown();
+          window.location.href = '/admin';
+          return;
+        }
+        render_countdown();
+      }, 1000);
+    }
 
     // Check for updates on page load
     $(document).ready(function() {
@@ -442,6 +476,7 @@
       $('#update_log').html('<p>Initializing update...</p>');
       $('#update_status_final').hide();
       $('#close_progress_btn').hide();
+      stop_redirect_countdown();
 
       // Start the update
       start_update();
@@ -501,15 +536,10 @@
             $('#progress_text').text('Complete');
             $('#update_status_final').show();
             $('#update_status_final').css('background-color', '#d4edda');
-            $('#update_final_message').html('<strong>Update completed successfully!</strong><br>The application is restarting...<br><br><em>Redirecting in 30 seconds...</em>');
             $('#close_progress_btn').show();
             event_source.close();
             update_in_progress = false;
-
-            // Redirect after 30 seconds
-            setTimeout(function() {
-              window.location.href = '/admin';
-            }, 30000); // Increased to 30 seconds for reliable restart
+            start_redirect_countdown();
           } else if (message.status === 'error') {
             $('#progress_bar').removeClass('progress-bar-striped active');
             $('#progress_text').text('Error');
@@ -517,6 +547,7 @@
             $('#update_status_final').css('background-color', '#f8d7da');
             $('#update_final_message').html('<strong>Update failed!</strong><br>Check the log above for details.');
             $('#close_progress_btn').show();
+            stop_redirect_countdown();
             event_source.close();
             update_in_progress = false;
           }
@@ -542,6 +573,7 @@
         $('#update_status_final').css('background-color', '#f8d7da');
         $('#update_final_message').text('Error setting up update stream: ' + e.message);
         $('#close_progress_btn').show();
+        stop_redirect_countdown();
         update_in_progress = false;
       }
     }
