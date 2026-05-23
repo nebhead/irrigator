@@ -14,6 +14,18 @@ SUDO=""
 SUDOE=""
 SUDO_KEEPALIVE_PID=""
 
+# Determine which home directory should receive the installer log.
+# If launched with sudo, prefer the original user's home.
+LOG_USER="${SUDO_USER:-${USER}}"
+LOG_HOME="$(getent passwd "$LOG_USER" | cut -d: -f6)"
+LOG_HOME="${LOG_HOME:-$HOME}"
+LOG_FILE="$LOG_HOME/irrigator-install-$(date +%Y%m%d-%H%M%S).log"
+
+# Mirror all installer output to both terminal and log file.
+exec > >(tee -a "$LOG_FILE") 2>&1
+echo "Installer log: $LOG_FILE"
+echo "Started: $(date '+%Y-%m-%d %H:%M:%S %Z')"
+
 cleanup() {
     if [[ -n "$SUDO_KEEPALIVE_PID" ]]; then
         kill "$SUDO_KEEPALIVE_PID" >/dev/null 2>&1 || true
