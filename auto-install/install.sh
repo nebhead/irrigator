@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -Eeuo pipefail
+
 # Automatic Installation Script
 # Many thanks to the PiVPN project (pivpn.io) for much of the inspiration for this script
 # Run from https://raw.githubusercontent.com/nebhead/irrigator/main/auto-install/install.sh
@@ -24,12 +26,28 @@ LOG_FILE="$LOG_HOME/irrigator-install-$(date +%Y%m%d-%H%M%S).log"
 log_command() {
     echo
     echo "[COMMAND] $*"
+    set +e
     "$@" 2>&1 | tee -a "$LOG_FILE"
-    return ${PIPESTATUS[0]}
+    local rc=${PIPESTATUS[0]}
+    set -e
+    if [[ $rc -ne 0 ]]; then
+        log_note "ERROR: Command failed with exit code ${rc}: $*"
+    fi
+    return $rc
 }
 
 log_note() {
     echo "$*" | tee -a "$LOG_FILE"
+}
+
+on_error() {
+    local exit_code="$?"
+    local line_no="$1"
+    local failed_command="$2"
+
+    log_note "ERROR: Command failed with exit code ${exit_code} at line ${line_no}: ${failed_command}"
+    log_note "Installation aborted. Review installer log: ${LOG_FILE}"
+    exit "${exit_code}"
 }
 
 banner() {
@@ -42,6 +60,8 @@ banner() {
 
 log_note "Installer log: $LOG_FILE"
 log_note "Started: $(date '+%Y-%m-%d %H:%M:%S %Z')"
+
+trap 'on_error "$LINENO" "$BASH_COMMAND"' ERR
 
 cleanup() {
     if [[ -n "$SUDO_KEEPALIVE_PID" ]]; then
