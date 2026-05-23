@@ -28,9 +28,11 @@ def checkexists(comment_string, system_cron):
 
 # Main Start
 system_cron = CronTab(user='root')
+json_data_dict = ReadJSON() # This will create default schedules if none exist
+python_exec = GetPythonExecutable(json_data_dict)
 
 # Initialize Relays on Boot
-command_string = "cd /usr/local/bin/irrigator && sudo python3 control.py -i &"
+command_string = "cd /usr/local/bin/irrigator && sudo " + python_exec + " control.py -i &"
 comment_string = "Irrigator-Init"
 
 if (checkexists(comment_string, system_cron)==0):
@@ -52,7 +54,7 @@ if (checkexists(comment_string, system_cron)==0):
     system_cron.write()
 
 # Cache weather information every 15 minutes
-command_string = "cd /usr/local/bin/irrigator && sudo python3 openwx.py"
+command_string = "cd /usr/local/bin/irrigator && sudo " + python_exec + " openwx.py"
 comment_string = "Irrigator-WxCache"
 
 if (checkexists(comment_string, system_cron)==0):
@@ -63,10 +65,8 @@ if (checkexists(comment_string, system_cron)==0):
     system_cron.write()
 
 # Add schedules to the crontab
-json_data_dict = ReadJSON() # This will create default schedules if none exist
-
 for item in json_data_dict['schedules']:
-    command_string = "cd /usr/local/bin/irrigator && sudo python3 control.py -s " + item + " &"
+    command_string = "cd /usr/local/bin/irrigator && sudo " + python_exec + " control.py -s " + item + " &"
     if (checkexists(item, system_cron)==0):
         # If not found, create it.
         entry = system_cron.new(command=command_string,comment=item)

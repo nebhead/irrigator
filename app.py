@@ -75,6 +75,7 @@ check_and_run_upgrades()
 @app.route('/', methods=['POST','GET'])
 def dashboard(action=None):
 	json_data_dict = ReadJSON()
+	python_exec = GetPythonExecutable(json_data_dict)
 	wx_status = ReadJSON('wx_status.json', type="weather")
 
 	if (request.method == 'POST') and (action == 'manualcontrol'):
@@ -99,9 +100,9 @@ def dashboard(action=None):
 
 			if(json_data_dict['controls']['active'] == False):
 				if(json_data_dict['settings']['target_sys'] == 'None'):
-					execute_string = "python3 control.py -f -s " + str(response['startsched'] + " &") # For running on None
+					execute_string = python_exec + " control.py -f -s " + str(response['startsched'] + " &") # For running on None
 				else:
-					execute_string = "sudo python3 control.py -f -s " + str(response['startsched'] + " &")  # For running on CHIP or RasPi
+					execute_string = "sudo " + python_exec + " control.py -f -s " + str(response['startsched'] + " &")  # For running on CHIP or RasPi
 				os.system(execute_string)
 				start_delay = False
 				while(start_delay == False):
@@ -123,9 +124,9 @@ def dashboard(action=None):
 			print(duration) #DEBUG
 			if(json_data_dict['controls']['active'] == False):
 				if(json_data_dict['settings']['target_sys'] == 'None'):
-					execute_string = "python3 control.py -f -z " + str(response['startzone'] + " -d " + duration + " &") # For running on None
+					execute_string = python_exec + " control.py -f -z " + str(response['startzone'] + " -d " + duration + " &") # For running on None
 				else:
-					execute_string = "sudo python3 control.py -f -z " + str(response['startzone'] + " -d " + duration + " &") # For running on None
+					execute_string = "sudo " + python_exec + " control.py -f -z " + str(response['startzone'] + " -d " + duration + " &") # For running on None
 				os.system(execute_string)
 				start_delay = False
 				while(start_delay == False):
@@ -431,6 +432,7 @@ def schedule(action=None):
 @app.route('/settings', methods=['POST','GET'])
 def settings(action=None):
 	json_data_dict = ReadJSON()
+	python_exec = GetPythonExecutable(json_data_dict)
 	success = True
 	detail = ''
 
@@ -645,7 +647,7 @@ def settings(action=None):
 		if(success==True):
 			WriteJSON(json_data_dict)
 			if(update_weather_data):
-				execute_string = "python3 openwx.py" # Get weather after updating API Key or Location
+				execute_string = python_exec + " openwx.py" # Get weather after updating API Key or Location
 				os.system(execute_string) # Execute
 
 	elif (request.method == 'POST') and (action == 'modifygate'):
@@ -746,11 +748,12 @@ def admin(action=None):
 		WriteLog(event)
 		
 		json_data_dict = ReadJSON()
+		python_exec = GetPythonExecutable(json_data_dict)
 		# Kill and running jobs
 		if(json_data_dict['settings']['target_sys'] == 'None'):
-			execute_string = "python3 control.py -i &"  # For running on None
+			execute_string = python_exec + " control.py -i &"  # For running on None
 		else:
-			execute_string = "sudo python3 control.py -i &"  # For running on CHIP or RasPi
+			execute_string = "sudo " + python_exec + " control.py -i &"  # For running on CHIP or RasPi
 		os.system(execute_string) # Initialize Relays
 		# Remove all Schedules from CronTab
 		for schedule_name, schedule_data in json_data_dict['schedules'].items():
@@ -761,12 +764,13 @@ def admin(action=None):
 		trigger_mqtt_discovery_refresh('factory_reset')
 		json_data_dict = create_wx_json()
 		WriteJSON(json_data_dict, 'wx_status.json')
-		os.system("sudo python3 initcron.py") # Initialize Relays
+		os.system("sudo " + python_exec + " initcron.py") # Initialize Relays
 
 	elif action == 'controls-reset':
 		event = "Admin: Control Reset"
 		WriteLog(event)
 		json_data_dict = ReadJSON()
+		python_exec = GetPythonExecutable(json_data_dict)
 		json_data_dict['controls']['manual_override'] = False
 		json_data_dict['controls']['active'] = False
 		for item in json_data_dict['zonemap']:
@@ -774,9 +778,9 @@ def admin(action=None):
 		for item in json_data_dict['schedules']:
 			json_data_dict['schedules'][item]['start_time']['active'] = False
 		if(json_data_dict['settings']['target_sys'] == 'None'):
-			execute_string = "python3 control.py -i &"  # For running on None
+			execute_string = python_exec + " control.py -i &"  # For running on None
 		else:
-			execute_string = "sudo python3 control.py -i &"  # For running on CHIP or RasPi
+			execute_string = "sudo " + python_exec + " control.py -i &"  # For running on CHIP or RasPi
 		os.system(execute_string) # Initialize Relays
 
 		WriteJSON(json_data_dict)
@@ -883,9 +887,10 @@ def update_crontab(json_data_dict, sched_name, action):
 	errorcode = 0
 	system_cron = CronTab(user='root')
 	entry = 0
+	python_exec = GetPythonExecutable(json_data_dict)
 
 	if(action == 'add'):
-		command_string = "cd " + pathtoirrigator + " && sudo python3 control.py -s " + sched_name + " &"
+		command_string = "cd " + pathtoirrigator + " && sudo " + python_exec + " control.py -s " + sched_name + " &"
 		entry = system_cron.new(command=command_string,comment=sched_name)
 		entry.setall(json_data_dict['schedules'][sched_name]['start_time']['cron_string'])
 		entry.enable()
@@ -896,7 +901,7 @@ def update_crontab(json_data_dict, sched_name, action):
 		if (entry==0):
 			print("Did not find entry.")
 			# If not found, create it.
-			command_string = "cd " + pathtoirrigator + " && sudo python3 control.py -s " + sched_name + " &"
+			command_string = "cd " + pathtoirrigator + " && sudo " + python_exec + " control.py -s " + sched_name + " &"
 			entry = system_cron.new(command=command_string,comment=sched_name)
 			entry.setall(json_data_dict['schedules'][sched_name]['start_time']['cron_string'])
 			entry.enable()

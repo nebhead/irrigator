@@ -21,6 +21,7 @@ from cron_descriptor import get_description, ExpressionDescriptor
 
 VERSION_MANIFEST_FILENAME = "manifest.json"
 DEFAULT_VERSION = "0000.00.000"
+DEFAULT_PYTHON_EXECUTABLE = "/usr/bin/python3"
 VERSION_COMPONENT_LABELS = {
     'app': 'Flask Web Application',
     'control': 'Control Application',
@@ -62,10 +63,18 @@ def ReadJSON(json_data_filename="irrigator.json", type="settings"):
 		raise last_error
 
 	if type == 'settings':
+		if 'settings' not in json_data_dict:
+			json_data_dict['settings'] = {}
 		# Check relay trigger which was added post-initial release 
 		if 'relay_trigger' not in json_data_dict['settings'].keys():
 			relay_trigger = 0  # Set default to active low (0) triggered relays 
 			json_data_dict['settings']['relay_trigger'] = 0  # set the default to active low (0) triggered in settings, and save
+			WriteJSON(json_data_dict)
+		if 'use_venv' not in json_data_dict['settings']:
+			json_data_dict['settings']['use_venv'] = False
+			WriteJSON(json_data_dict)
+		if 'python_exec' not in json_data_dict['settings']:
+			json_data_dict['settings']['python_exec'] = DEFAULT_PYTHON_EXECUTABLE
 			WriteJSON(json_data_dict)
 		# Check if history and forecast days are set
 		if 'history_days' not in json_data_dict['wx_data']:
@@ -182,6 +191,21 @@ def WriteStartupVersionLog(component_name, component_label=None, manifest_data=N
     event = f"***** {component_label} Starting - Version {version} *****"
     WriteLog(event)
 
+def GetPythonExecutable(json_data_dict=None):
+	if json_data_dict is None:
+		json_data_dict = ReadJSON()
+
+	settings = json_data_dict.get('settings', {})
+	python_exec = settings.get('python_exec', DEFAULT_PYTHON_EXECUTABLE)
+
+	if isinstance(python_exec, str) and os.path.isfile(python_exec) and os.access(python_exec, os.X_OK):
+		return python_exec
+
+	if settings.get('use_venv', False):
+		WriteLog(f"Configured python executable '{python_exec}' was not found. Falling back to {DEFAULT_PYTHON_EXECUTABLE}.")
+
+	return DEFAULT_PYTHON_EXECUTABLE
+
 def create_json():
     irrigator = {}
 
@@ -193,7 +217,9 @@ def create_json():
     irrigator['settings'] = {
         'target_sys': 'None',  # Select CHIP, RasPi or test
         'zone_gate': 29,       # This is the GPIO pin responsible for gating the sprinkler pins during power-up, shutdown, and reboot
-        'relay_trigger' : 0    # 0 for active low relays, 1 for active high relays 
+		'relay_trigger' : 0,   # 0 for active low relays, 1 for active high relays
+		'use_venv': False,
+		'python_exec': DEFAULT_PYTHON_EXECUTABLE
     }
 
     irrigator['mqtt'] = {

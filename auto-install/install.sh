@@ -10,20 +10,39 @@
 #
 # NOTE: Pre-Requisites to run Raspi-Config first.  See README.md.
 
+SUDO=""
+SUDOE=""
+SUDO_KEEPALIVE_PID=""
+
+cleanup() {
+    if [[ -n "$SUDO_KEEPALIVE_PID" ]]; then
+        kill "$SUDO_KEEPALIVE_PID" >/dev/null 2>&1 || true
+    fi
+}
+
+trap cleanup EXIT
+
 # Must be root to install
 if [[ $EUID -eq 0 ]];then
     echo "You are root."
 else
     echo "SUDO will be used for the install."
-    # Check if it is actually installed
-    # If it isn't, exit because the install cannot complete
-    if [[ $(dpkg-query -s sudo) ]];then
+    # Check if sudo is installed
+    if command -v sudo >/dev/null 2>&1; then
         export SUDO="sudo"
         export SUDOE="sudo -E"
     else
-        echo "Please install sudu."
+        echo "Please install sudo."
         exit 1
     fi
+
+    # Authenticate once up front, then refresh sudo timestamp while installer runs.
+    echo "*************************************************************************"
+    echo "Please enter your sudo password to continue installation."
+    echo "*************************************************************************"
+    sudo -v || { echo "Failed to authenticate with sudo."; exit 1; }
+    while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
+    SUDO_KEEPALIVE_PID=$!
 fi
 
 # Find the rows and columns. Will default to 80x24 if it can not be detected.
@@ -39,7 +58,7 @@ r=$(( r < 20 ? 20 : r ))
 c=$(( c < 70 ? 70 : c ))
 
 # Display the welcome dialog
-whiptail --msgbox --backtitle "Welcome" --title "IrriGator Automated Installer" "This installer will transform your SBC into a connected smart-sprinkler.  NOTE: This installer is intended to be run on a fresh install of Raspbian Lite Stretch +.  This script is currently in Alpha testing so there may be bugs." ${r} ${c}
+whiptail --msgbox --backtitle "Welcome" --title "IrriGator Automated Installer" "This installer will transform your SBC into a connected smart-sprinkler. NOTE: This installer is intended for Raspberry Pi OS Lite Bullseye or newer." ${r} ${c}
 
 # Starting actual steps for installation
 clear
@@ -48,7 +67,11 @@ echo "**                                                                     **"
 echo "**      Setting /tmp to RAM based storage in /etc/fstab                **"
 echo "**                                                                     **"
 echo "*************************************************************************"
-echo "tmpfs /tmp  tmpfs defaults,noatime 0 0" | sudo tee -a /etc/fstab > /dev/null
+if grep -qE '^tmpfs\s+/tmp\s+tmpfs' /etc/fstab; then
+    echo "/tmp tmpfs entry already exists in /etc/fstab. Skipping update."
+else
+    echo "tmpfs /tmp  tmpfs defaults,noatime 0 0" | $SUDO tee -a /etc/fstab > /dev/null
+fi
 clear
 echo "*************************************************************************"
 echo "**                                                                     **"
@@ -64,15 +87,21 @@ echo "**                                                                     **"
 echo "*************************************************************************"
 $SUDO apt upgrade -y
 
-# Install dependancies
+# Install dependencies
 clear
 echo "*************************************************************************"
 echo "**                                                                     **"
-echo "**      Installing Dependancies... (This could take several minutes)   **"
+echo "**      Installing Dependencies... (This could take several minutes)   **"
 echo "**                                                                     **"
 echo "*************************************************************************"
-$SUDO apt install python3-dev python3-rpi.gpio python3-pip nginx git gunicorn3 supervisor -y
-$SUDO pip3 install flask python-crontab cron-descriptor requests geopy paho-mqtt
+$SUDO apt install python3-dev python3-pip python3-venv nginx git supervisor -y
+
+if grep -q "Raspberry Pi 5" /proc/device-tree/model 2>/dev/null; then
+    echo "Raspberry Pi 5 detected. Installing python3-rpi-lgpio."
+    $SUDO apt install python3-rpi-lgpio -y
+else
+    $SUDO apt install python3-rpi.gpio -y
+fi
 
 # Grab project files
 clear
@@ -82,7 +111,36 @@ echo "**      Cloning Project from GitHub...                                 **"
 echo "**                                                                     **"
 echo "*************************************************************************"
 cd /usr/local/bin
+if [[ -d /usr/local/bin/irrigator ]]; then
+    echo "Existing /usr/local/bin/irrigator directory found."
+    echo "Please remove or rename it before running this installer."
+    exit 1
+fi
 $SUDO git clone https://github.com/nebhead/irrigator
+
+### Setup Python VENV and Install Python dependencies
+clear
+echo "*************************************************************************"
+echo "**                                                                     **"
+echo "**      Setting up Python VENV and installing modules...               **"
+echo "**                                                                     **"
+echo "*************************************************************************"
+$SUDO python3 -m venv --system-site-packages /usr/local/bin/irrigator/.venv
+$SUDO /usr/local/bin/irrigator/.venv/bin/pip install --upgrade pip
+$SUDO /usr/local/bin/irrigator/.venv/bin/pip install -r /usr/local/bin/irrigator/auto-install/requirements.txt
+
+# Create/update irrigator.json defaults for this fresh install so runtime
+# scripts know to use the venv interpreter.
+cd /usr/local/bin/irrigator
+$SUDO /usr/local/bin/irrigator/.venv/bin/python - <<'PY'
+from common import ReadJSON, WriteJSON
+
+data = ReadJSON()
+data.setdefault('settings', {})
+data['settings']['use_venv'] = True
+data['settings']['python_exec'] = '/usr/local/bin/irrigator/.venv/bin/python'
+WriteJSON(data)
+PY
 
 ### Setup nginx to proxy to gunicorn
 clear
@@ -140,7 +198,7 @@ $SUDO service supervisor start
 
 # Setup CRONTAB
 cd /usr/local/bin/irrigator
-$SUDO python3 initcron.py
+$SUDO /usr/local/bin/irrigator/.venv/bin/python initcron.py
 
 # Rebooting
 whiptail --msgbox --backtitle "Install Complete / Reboot Required" --title "Installation Completed - Rebooting" "Congratulations, the installation is complete.  At this time, we will perform a reboot and your application should be ready.  You should be able to access your application by opening a browser on your PC or other device and using the IP address for this SBC.  Enjoy!" ${r} ${c}

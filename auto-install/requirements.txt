@@ -1,0 +1,7 @@
+Flask
+gunicorn
+python-crontab
+cron-descriptor
+requests
+geopy
+paho-mqtt
