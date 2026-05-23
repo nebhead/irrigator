@@ -30,6 +30,17 @@ app_startup_logged = False
 update_queue = Queue()
 update_thread = None
 update_in_progress = False
+mqtt_discovery_refresh_marker = '.mqtt_discovery_refresh'
+
+def trigger_mqtt_discovery_refresh(reason='unknown'):
+	"""Signal mqtt.py to refresh Home Assistant discovery topics."""
+	try:
+		marker_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), mqtt_discovery_refresh_marker)
+		with open(marker_path, 'w') as marker_file:
+			marker_file.write(datetime.datetime.utcnow().isoformat() + ' ' + str(reason) + '\n')
+		WriteLog('MQTT-Discovery: Refresh marker updated (' + str(reason) + ')')
+	except Exception as e:
+		WriteLog('MQTT-Discovery: Failed to update refresh marker: ' + str(e))
 
 def log_app_startup():
 	global app_startup_logged
@@ -281,6 +292,8 @@ def schedule(action=None):
 				if(conflict_found):
 					success = False
 					detail = conflict_msg
+				else:
+					trigger_mqtt_discovery_refresh('schedule_modify')
 
 		else:
 			success = False
@@ -408,6 +421,8 @@ def schedule(action=None):
 					if(conflict_found):
 						success = False
 						detail = conflict_msg
+					else:
+						trigger_mqtt_discovery_refresh('schedule_add')
 
 	return render_template('schedule.html', jdict=json_data_dict, action=action, success=success, detail=detail)
 
@@ -478,6 +493,7 @@ def settings(action=None):
 		if(success==True):
 			print('Success:  Writing JSON data to file.')
 			WriteJSON(json_data_dict)  # There be dragons - enable only when tested.
+			trigger_mqtt_discovery_refresh('zone_modify')
 
 
 	elif (request.method == 'POST') and (action == 'add'):
@@ -523,6 +539,7 @@ def settings(action=None):
 		if(success==True):
 			print('Success:  Writing JSON data to file.')
 			WriteJSON(json_data_dict)  # There be dragons - enable only when tested.
+			trigger_mqtt_discovery_refresh('zone_add')
 
 	elif (request.method == 'POST') and (action == 'system'):
 		success = True
@@ -741,6 +758,7 @@ def admin(action=None):
 		# Build new JSON with default values
 		json_data_dict = create_json()
 		WriteJSON(json_data_dict)
+		trigger_mqtt_discovery_refresh('factory_reset')
 		json_data_dict = create_wx_json()
 		WriteJSON(json_data_dict, 'wx_status.json')
 		os.system("sudo python3 initcron.py") # Initialize Relays
