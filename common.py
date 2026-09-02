@@ -679,6 +679,7 @@ def DeployMQTTSupervisorConfig(trigger='unknown'):
 		conf_src = os.path.join(install_dir, 'auto-install', 'supervisor', 'mqtt.conf')
 		conf_dst_dir = '/etc/supervisor/conf.d'
 		conf_dst = os.path.join(conf_dst_dir, 'mqtt.conf')
+		mqtt_script = os.path.join(install_dir, 'mqtt.py')
 
 		WriteLog(f"MQTT deploy [{trigger}]: source={conf_src} destination={conf_dst} euid={os.geteuid()}")
 
@@ -698,6 +699,45 @@ def DeployMQTTSupervisorConfig(trigger='unknown'):
 
 		if not os.path.exists(conf_dst):
 			raise Exception(f"Destination file missing after copy: {conf_dst}")
+
+		# Normalize command paths for both venv and non-venv installs.
+		venv_python = os.path.join(install_dir, '.venv', 'bin', 'python')
+		venv_python3 = os.path.join(install_dir, '.venv', 'bin', 'python3')
+		if os.path.isfile(venv_python) and os.access(venv_python, os.X_OK):
+			python_exec = venv_python
+		elif os.path.isfile(venv_python3) and os.access(venv_python3, os.X_OK):
+			python_exec = venv_python3
+		else:
+			python_exec = GetPythonExecutable()
+
+		try:
+			with open(conf_dst, 'r') as conf_file:
+				conf_lines = conf_file.readlines()
+		except Exception as e:
+			raise Exception(f"Could not read destination config: {str(e)}")
+
+		updated_lines = []
+		for line in conf_lines:
+			if line.startswith('command='):
+				updated_lines.append(f"command={python_exec} {mqtt_script}\n")
+			elif line.startswith('directory='):
+				updated_lines.append(f"directory={install_dir}\n")
+			else:
+				updated_lines.append(line)
+
+		tmp_fd, tmp_conf_path = tempfile.mkstemp(prefix='mqtt.supervisor.', suffix='.conf')
+		try:
+			with os.fdopen(tmp_fd, 'w') as tmp_conf:
+				tmp_conf.writelines(updated_lines)
+			copy_norm_result, copy_norm_sudo = run_with_sudo_fallback(['cp', tmp_conf_path, conf_dst])
+			if copy_norm_result.returncode != 0:
+				raise Exception("Could not write normalized mqtt.conf: " + (copy_norm_result.stderr.strip() or copy_norm_result.stdout.strip() or 'unknown error'))
+			result['details'].append(f"Normalized mqtt.conf command path using {'sudo' if copy_norm_sudo else 'direct'} command: {python_exec}")
+		finally:
+			try:
+				os.remove(tmp_conf_path)
+			except OSError:
+				pass
 
 		reread_result, reread_sudo = run_with_sudo_fallback(['supervisorctl', 'reread'])
 		result['details'].append(f"supervisorctl reread rc={reread_result.returncode} sudo={reread_sudo}")
@@ -785,6 +825,21 @@ def upgrade_mqtt_supervisor_policy_2026_09_002():
 		WriteLog(f"MQTT supervisor restart-policy upgrade failed: {str(e)}")
 		raise
 
+def upgrade_mqtt_supervisor_python_fallback_2026_09_003():
+	"""
+	Deploy mqtt.conf using a valid Python interpreter for venv and non-venv installs.
+	"""
+	try:
+		WriteLog("Upgrade: Deploying MQTT supervisor python-path compatibility update...")
+		deploy_result = DeployMQTTSupervisorConfig(trigger='upgrade_mqtt_supervisor_python_fallback_2026_09_003')
+		if deploy_result['success']:
+			WriteLog("✓ MQTT supervisor python-path compatibility update deployed")
+		else:
+			raise Exception(deploy_result['message'])
+	except Exception as e:
+		WriteLog(f"MQTT supervisor python-path compatibility upgrade failed: {str(e)}")
+		raise
+
 def RunUpgradePath(old_version, new_version):
 	"""
 	Execute upgrade/migration logic based on version comparison
@@ -821,6 +876,7 @@ def RunUpgradePath(old_version, new_version):
 	upgrade_steps = [
 		((2026, 5, 3), upgrade_mqtt_2026_05_003, "MQTT bridge installation"),
 		((2026, 9, 2), upgrade_mqtt_supervisor_policy_2026_09_002, "MQTT supervisor restart policy update"),
+		((2026, 9, 3), upgrade_mqtt_supervisor_python_fallback_2026_09_003, "MQTT supervisor python path compatibility update"),
 	]
 	
 	# Execute each upgrade step that falls between old_version and new_version
