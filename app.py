@@ -731,11 +731,12 @@ def settings(action=None):
 		if(success==True):
 			print('Success:  Writing MQTT settings to file.')
 			WriteJSON(json_data_dict)
-			if mqtt_enabled:
-				deploy_result = DeployMQTTSupervisorConfig(trigger='settings_mqtt_save')
-				if not deploy_result['success']:
-					success = False
-					detail = 'MQTT settings saved but supervisor deployment failed: ' + str(deploy_result['message'])
+			# Always redeploy supervisor config so both enable and disable actions
+			# immediately apply process policy updates.
+			deploy_result = DeployMQTTSupervisorConfig(trigger='settings_mqtt_save')
+			if not deploy_result['success']:
+				success = False
+				detail = 'MQTT settings saved but supervisor deployment failed: ' + str(deploy_result['message'])
 
 	return render_template('settings.html', jdict=json_data_dict, action=action, success=success, detail=detail)
 

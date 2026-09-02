@@ -770,6 +770,21 @@ def upgrade_mqtt_2026_05_003():
 		WriteLog(f"MQTT upgrade failed: {str(e)}")
 		raise
 
+def upgrade_mqtt_supervisor_policy_2026_09_002():
+	"""
+	Deploy updated mqtt.conf restart policy to prevent log spam when MQTT is disabled.
+	"""
+	try:
+		WriteLog("Upgrade: Deploying MQTT supervisor restart-policy update...")
+		deploy_result = DeployMQTTSupervisorConfig(trigger='upgrade_mqtt_supervisor_policy_2026_09_002')
+		if deploy_result['success']:
+			WriteLog("✓ MQTT supervisor restart-policy update deployed")
+		else:
+			raise Exception(deploy_result['message'])
+	except Exception as e:
+		WriteLog(f"MQTT supervisor restart-policy upgrade failed: {str(e)}")
+		raise
+
 def RunUpgradePath(old_version, new_version):
 	"""
 	Execute upgrade/migration logic based on version comparison
@@ -805,6 +820,7 @@ def RunUpgradePath(old_version, new_version):
 	# Format: (version_tuple, function, description)
 	upgrade_steps = [
 		((2026, 5, 3), upgrade_mqtt_2026_05_003, "MQTT bridge installation"),
+		((2026, 9, 2), upgrade_mqtt_supervisor_policy_2026_09_002, "MQTT supervisor restart policy update"),
 	]
 	
 	# Execute each upgrade step that falls between old_version and new_version
